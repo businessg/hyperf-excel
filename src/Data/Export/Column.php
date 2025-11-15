@@ -5,12 +5,20 @@ declare(strict_types=1);
 namespace Vartruexuan\HyperfExcel\Data\Export;
 
 use Vartruexuan\HyperfExcel\Data\BaseObject;
+use Vartruexuan\HyperfExcel\Data\Type\BaseType;
+use Vartruexuan\HyperfExcel\Data\Type\TextType;
 
 /**
  * 列配置
  */
 class Column extends BaseObject
 {
+    // 单元格类型常量（保留用于向后兼容）
+    public const TYPE_TEXT = 'text';      // 文本（默认）
+    public const TYPE_URL = 'url';       // 链接
+    public const TYPE_FORMULA = 'formula'; // 公式
+    public const TYPE_DATE = 'date';      // 日期
+    public const TYPE_IMAGE = 'image';    // 图片
 
     /**
      * 列标识
@@ -28,10 +36,12 @@ class Column extends BaseObject
 
     /**
      * 数据类型
+     * 可以是字符串（如 'text', 'url'）或类型对象（如 TextType, UrlType）
+     * 字符串会自动转换为对应的类型对象
      *
-     * @var string
+     * @var string|BaseType
      */
-    public string $type;
+    public string|BaseType $type;
     /**
      * 字段名
      *
@@ -119,12 +129,22 @@ class Column extends BaseObject
     public bool $hasChildren = false;
 
     /**
-     * 额外配置
+     * 构造函数
      *
-     * @var array
+     * @param array $config
      */
-    public array $options = [];
-
+    public function __construct(array $config = [])
+    {
+        parent::__construct($config);
+        
+        // 如果 type 是字符串，自动转换为类型对象
+        if (isset($this->type) && is_string($this->type)) {
+            $this->type = BaseType::from($this->type);
+        } elseif (!isset($this->type)) {
+            // 默认使用文本类型
+            $this->type = new TextType();
+        }
+    }
 
     /**
      * 处理列结构并返回三个部分的数据
@@ -165,9 +185,17 @@ class Column extends BaseObject
             $rowSpan = $hasChildren ? 1 : ($endRow - $startRow + 1);
             $colSpan = $hasChildren ? static::countLeafColumns($column->children) : 1;
 
+            // 处理 type，确保是类型对象
+            $type = $column->type ?? new TextType();
+            if (is_string($type)) {
+                $type = BaseType::from($type);
+            }
+
             $columnInfo = new Column([
                 'title' => $column->title,
                 'field' => $column->field,
+                'type' => $type,
+                'callback' => $column->callback ?? null,
                 'row' => $startRow,
                 'width' => $column->width,
                 'height' => $column->height,
