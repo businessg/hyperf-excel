@@ -38,13 +38,6 @@ use Vartruexuan\HyperfExcel\Helper\Helper;
 class SpreadSheetDriver extends Driver
 {
     /**
-     * 图片 URL 到本地路径的映射缓存（避免重复下载）
-     *
-     * @var array<string, string|false>
-     */
-    protected array $imageCache = [];
-
-    /**
      * 图片计数器（确保每个图片都有唯一索引）
      *
      * @var int
@@ -331,9 +324,9 @@ class SpreadSheetDriver extends Driver
                 // 格式化数据
                 $formattedList = $sheet->formatList($list, $columns);
                 // 批量下载图片（协程并发）
-                $this->batchDownloadImages($columns, $formattedList);
+                $this->batchDownloadImages($columns, $formattedList, $config);
                 // 按单元格方式插入数据
-                $this->insertDataByCell($worksheet, $columns, $formattedList, $currentRow);
+                $this->insertDataByCell($worksheet, $columns, $formattedList, $currentRow, $config);
                 $currentRow += $listCount;
             }
 
@@ -352,7 +345,7 @@ class SpreadSheetDriver extends Driver
      * @param int $startRow
      * @return void
      */
-    protected function insertDataByCell(Worksheet $worksheet, array $columns, array $list, int $startRow)
+    protected function insertDataByCell(Worksheet $worksheet, array $columns, array $list, int $startRow, ExportConfig $config = null)
     {
         foreach ($list as $rowIndex => $row) {
             $excelRowIndex = $startRow + $rowIndex; // Excel 行索引（从1开始）
@@ -362,7 +355,7 @@ class SpreadSheetDriver extends Driver
                 $type = $column->type ?? new \Vartruexuan\HyperfExcel\Data\Type\TextType();
 
                 // 根据类型插入单元格
-                $this->insertCell($worksheet, $type, $excelRowIndex, $colIndex, $value, $column);
+                $this->insertCell($worksheet, $type, $excelRowIndex, $colIndex, $value, $column, $config);
             }
         }
     }
@@ -379,7 +372,7 @@ class SpreadSheetDriver extends Driver
      * @return void
      * @throws ExcelException
      */
-    protected function insertCell(Worksheet $worksheet, BaseType $type, int $rowIndex, int $colIndex, $value, Column $column)
+    protected function insertCell(Worksheet $worksheet, BaseType $type, int $rowIndex, int $colIndex, $value, Column $column, ExportConfig $config = null)
     {
         $dataType = $type->name;
         $methodName = 'insert' . ucfirst($dataType);
@@ -389,7 +382,7 @@ class SpreadSheetDriver extends Driver
             return;
         }
 
-        call_user_func([$this, $methodName], $worksheet, $rowIndex, $colIndex, $value, $type, $column);
+        call_user_func([$this, $methodName], $worksheet, $rowIndex, $colIndex, $value, $type, $column, $config);
     }
 
     /**
@@ -512,19 +505,31 @@ class SpreadSheetDriver extends Driver
      * @param Column $column
      * @return void
      */
-    protected function insertImage(Worksheet $worksheet, int $rowIndex, int $colIndex, $value, BaseType $type, Column $column)
+    protected function insertImage(Worksheet $worksheet, int $rowIndex, int $colIndex, $value, BaseType $type, Column $column, ExportConfig $config = null)
     {
         $imageType = $type instanceof \Vartruexuan\HyperfExcel\Data\Type\ImageType ? $type : new \Vartruexuan\HyperfExcel\Data\Type\ImageType();
         $imagePath = (string)$value;
+        
+        // 记录用户是否设置了自定义尺寸（在 calculateScale 之前，因为 calculateScale 会更新属性）
+        $hasCustomSize = ($imageType->width !== null || $imageType->height !== null || 
+                         $imageType->widthScale !== null || $imageType->heightScale !== null);
 
-        // 如果是 URL，从缓存中获取已下载的路径
+        // 如果是 URL，从文件系统中获取已下载的路径
         if (strpos($imagePath, 'http') === 0) {
-            $imagePath = $this->imageCache[$imagePath] ?? false;
-            if (!$imagePath) {
-                // 缓存中没有或下载失败，使用文本
+            $originalUrl = $imagePath;
+            $tempDir = $this->getTempDir();
+            $token = $config ? ($config->getToken() ?: 'default') : 'default';
+            
+            // 根据 URL 计算文件路径：临时目录/token/images/md5(url)
+            $filePath = $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . md5($originalUrl);
+            
+            if (!file_exists($filePath)) {
+                // 文件不存在，使用文本
                 $this->insertText($worksheet, $rowIndex, $colIndex, $value, $type, $column);
                 return;
             }
+            
+            $imagePath = $filePath;
         }
 
         // 检查文件是否存在
@@ -546,13 +551,13 @@ class SpreadSheetDriver extends Driver
         $originalWidth = $imageInfo[0];
         $originalHeight = $imageInfo[1];
 
-        // 根据配置计算缩放比例
+        // 计算宽高和比例（calculateScale 会确保四个字段都有值）
         $scales = $imageType->calculateScale($originalWidth, $originalHeight);
+        // SpreadSheetDriver 直接使用宽高设置图片
+        $finalWidth = $scales['width'];
+        $finalHeight = $scales['height'];
         $widthScale = $scales['widthScale'];
         $heightScale = $scales['heightScale'];
-
-        $finalWidth = (int)($originalWidth * $widthScale);
-        $finalHeight = (int)($originalHeight * $heightScale);
 
         // 调整单元格大小以容纳图片
         $rowDimension = $worksheet->getRowDimension($rowIndex);
@@ -563,16 +568,29 @@ class SpreadSheetDriver extends Driver
 
         $colDimension = $worksheet->getColumnDimension($colStr);
         $currentColWidth = $colDimension->getWidth();
-        if ($currentColWidth === -1 || $currentColWidth < $finalWidth / 7) { // 7 是像素到字符宽度的转换比例
-            $colDimension->setWidth($finalWidth / 7);
+        // 列宽计算：像素宽度 ÷ 7 ≈ 列宽（字符宽度），额外增加一些宽度以确保图片完整显示
+        $requiredColWidth = ($finalWidth / 7) + 1; // 额外增加 1 个字符宽度
+        if ($currentColWidth === -1 || $currentColWidth < $requiredColWidth) {
+            $colDimension->setWidth($requiredColWidth);
         }
 
-        // 关键修复：即使图片路径相同，也要为每个单元格创建独立的图片副本
+        // 使用 token 目录创建图片副本（避免不同导出任务之间的冲突）
         // PhpSpreadsheet 可能会根据路径去重，所以我们需要为每个单元格创建临时副本
+        // 但相同图片只下载一次，这里只是为每个单元格创建独立的文件引用
         self::$imageCounter++;
         $tempDir = $this->getTempDir();
+        $token = $config ? ($config->getToken() ?: 'default') : 'default';
+        // 图片副本目录：临时目录/token/images/cells（用于存放单元格副本）
+        $cellImageDir = $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'cells';
+        if (!is_dir($cellImageDir)) {
+            if (!mkdir($cellImageDir, 0777, true)) {
+                throw new ExcelException('Failed to build cell image directory');
+            }
+        }
+        
+        // 为每个单元格创建唯一的图片副本（使用单元格坐标和计数器）
         $imageHash = md5($imagePath . $cellCoordinate . self::$imageCounter);
-        $tempImagePath = $tempDir . DIRECTORY_SEPARATOR . 'img_' . $imageHash . '_' . basename($imagePath);
+        $tempImagePath = $cellImageDir . DIRECTORY_SEPARATOR . 'img_' . $imageHash . '_' . basename($imagePath);
         
         // 如果临时文件不存在，复制原图片
         if (!file_exists($tempImagePath)) {
@@ -595,6 +613,7 @@ class SpreadSheetDriver extends Driver
         $drawing->setCoordinates($cellCoordinate);
         
         // 设置图片尺寸
+        // PhpSpreadsheet 的 setWidth 和 setHeight 使用像素单位，直接使用计算出的宽高
         $drawing->setWidth($finalWidth);
         $drawing->setHeight($finalHeight);
         
@@ -602,8 +621,9 @@ class SpreadSheetDriver extends Driver
         $drawing->setOffsetX(2);
         $drawing->setOffsetY(2);
         
-        // 设置图片随单元格移动和调整大小
-        $drawing->setResizeProportional(true);
+        // 如果用户明确设置了宽高或比例，禁用按比例缩放，使用精确的宽高
+        // 如果四个字段都未设置（使用原始尺寸），则启用按比例缩放
+        $drawing->setResizeProportional(!$hasCustomSize);
         
         // 关键：先设置所有属性，最后再调用 setWorksheet
         // setWorksheet 会自动将 drawing 添加到 worksheet 的 drawing collection
@@ -975,192 +995,5 @@ class SpreadSheetDriver extends Driver
         }
     }
 
-    /**
-     * 批量下载图片（协程并发下载）
-     *
-     * @param Column[] $columns
-     * @param array $list
-     * @return void
-     */
-    protected function batchDownloadImages(array $columns, array $list)
-    {
-        // 收集所有需要下载的图片 URL（去重）
-        $imageUrls = [];
-        foreach ($list as $row) {
-            foreach ($columns as $column) {
-                $type = $column->type ?? new \Vartruexuan\HyperfExcel\Data\Type\TextType();
-                if ($type instanceof \Vartruexuan\HyperfExcel\Data\Type\ImageType || $type->name === 'image') {
-                    $value = $row[$column->field] ?? '';
-                    if (!empty($value) && strpos((string)$value, 'http') === 0) {
-                        $url = (string)$value;
-                        // 如果缓存中没有，且不在待下载列表中，则加入待下载列表
-                        if (!isset($this->imageCache[$url]) && !in_array($url, $imageUrls)) {
-                            $imageUrls[] = $url;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (empty($imageUrls)) {
-            return;
-        }
-
-        // 使用协程并发下载
-        $this->downloadImagesConcurrently($imageUrls);
-    }
-
-    /**
-     * 协程并发下载图片
-     *
-     * @param array $urls
-     * @return void
-     */
-    protected function downloadImagesConcurrently(array $urls)
-    {
-        $tempDir = $this->getTempDir();
-
-        // 过滤已存在的文件
-        $needDownloadUrls = [];
-        foreach ($urls as $url) {
-            $filePath = $tempDir . DIRECTORY_SEPARATOR . md5($url);
-            if (file_exists($filePath)) {
-                $this->imageCache[$url] = $filePath;
-            } else {
-                $needDownloadUrls[] = $url;
-            }
-        }
-
-        if (empty($needDownloadUrls)) {
-            return;
-        }
-
-        // 获取批量下载阈值（默认 10）
-        $batchThreshold = $this->config['image_batch_threshold'] ?? 10;
-        $batchThreshold = max(1, (int)$batchThreshold);
-
-        // 按阈值切割成多个批次
-        $batches = array_chunk($needDownloadUrls, $batchThreshold);
-
-        // 逐批次下载
-        foreach ($batches as $batch) {
-            // 判断是否在协程环境
-            if (\Hyperf\Coroutine\Coroutine::inCoroutine()) {
-                // 使用 Hyperf Parallel 并发下载
-                $this->downloadImagesWithParallel($batch, $tempDir);
-            } else {
-                // 使用 Guzzle 异步请求下载
-                $this->downloadImagesWithGuzzle($batch, $tempDir);
-            }
-        }
-    }
-
-    /**
-     * 使用 Hyperf Parallel 并发下载图片（协程环境）
-     *
-     * @param array $urls
-     * @param string $tempDir
-     * @return void
-     */
-    protected function downloadImagesWithParallel(array $urls, string $tempDir)
-    {
-        $parallel = new \Hyperf\Coroutine\Parallel();
-
-        // 为每个 URL 创建下载任务
-        foreach ($urls as $url) {
-            $parallel->add(function () use ($url, $tempDir) {
-                $filePath = $tempDir . DIRECTORY_SEPARATOR . md5($url);
-
-                try {
-                    $content = @file_get_contents($url, false, stream_context_create([
-                        'http' => [
-                            'timeout' => 30,
-                            'verify_peer' => false,
-                            'verify_peer_name' => false,
-                            'follow_location' => true,
-                            'max_redirects' => 5,
-                        ]
-                    ]));
-
-                    if ($content && @file_put_contents($filePath, $content)) {
-                        return ['url' => $url, 'success' => true, 'path' => $filePath];
-                    } else {
-                        return ['url' => $url, 'success' => false, 'path' => null];
-                    }
-                } catch (\Throwable $e) {
-                    return ['url' => $url, 'success' => false, 'path' => null, 'error' => $e->getMessage()];
-                }
-            });
-        }
-
-        // 等待所有任务完成
-        try {
-            $results = $parallel->wait();
-
-            foreach ($results as $result) {
-                if ($result['success'] && $result['path']) {
-                    $this->imageCache[$result['url']] = $result['path'];
-                } else {
-                    $this->imageCache[$result['url']] = false;
-                }
-            }
-        } catch (\Throwable $e) {
-            // 处理异常，标记失败的 URL
-            foreach ($urls as $url) {
-                if (!isset($this->imageCache[$url])) {
-                    $this->imageCache[$url] = false;
-                }
-            }
-        }
-    }
-
-    /**
-     * 使用 Guzzle 异步请求下载图片（非协程环境）
-     *
-     * @param array $urls
-     * @param string $tempDir
-     * @return void
-     */
-    protected function downloadImagesWithGuzzle(array $urls, string $tempDir)
-    {
-        $client = new \GuzzleHttp\Client([
-            'timeout' => 30,
-            'verify' => false,
-            'http_errors' => false,
-        ]);
-
-        // 创建异步请求
-        $promises = [];
-        foreach ($urls as $url) {
-            $promises[$url] = $client->requestAsync('GET', $url);
-        }
-
-        // 等待所有请求完成
-        try {
-            $responses = \GuzzleHttp\Promise\Utils::unwrap($promises);
-
-            foreach ($responses as $url => $response) {
-                $filePath = $tempDir . DIRECTORY_SEPARATOR . md5($url);
-
-                if ($response->getStatusCode() === 200) {
-                    $content = $response->getBody()->getContents();
-                    if ($content && @file_put_contents($filePath, $content)) {
-                        $this->imageCache[$url] = $filePath;
-                    } else {
-                        $this->imageCache[$url] = false;
-                    }
-                } else {
-                    $this->imageCache[$url] = false;
-                }
-            }
-        } catch (\Throwable $e) {
-            // 处理异常，标记失败的 URL
-            foreach ($urls as $url) {
-                if (!isset($this->imageCache[$url])) {
-                    $this->imageCache[$url] = false;
-                }
-            }
-        }
-    }
 }
 

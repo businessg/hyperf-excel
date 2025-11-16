@@ -30,6 +30,12 @@ use Vartruexuan\HyperfExcel\Data\Import\Sheet as ImportSheet;
 use Vartruexuan\HyperfExcel\Data\Export\Sheet as ExportSheet;
 use Vartruexuan\HyperfExcel\Strategy\Path\ExportPathStrategyInterface;
 use Hyperf\Coroutine\Coroutine;
+use GuzzleHttp\Client;
+use GuzzleHttp\Promise\Utils;
+use Hyperf\Coroutine\Parallel;
+use Vartruexuan\HyperfExcel\Data\Export\Column;
+use Vartruexuan\HyperfExcel\Data\Type\ImageType;
+use Vartruexuan\HyperfExcel\Data\Type\TextType;
 
 abstract class Driver implements DriverInterface
 {
@@ -336,6 +342,200 @@ abstract class Driver implements DriverInterface
     public function getConfig(): array
     {
         return $this->config;
+    }
+
+    /**
+     * 批量下载图片（协程并发下载）
+     *
+     * @param Column[] $columns
+     * @param array $list
+     * @param ExportConfig $config
+     * @return void
+     */
+    protected function batchDownloadImages(array $columns, array $list, ExportConfig $config)
+    {
+        // 收集所有需要下载的图片 URL（去重）
+        $imageUrls = [];
+        $token = $config->getToken() ?: 'default';
+        $tempDir = $this->getTempDir();
+        $imageDir = $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images';
+        
+        foreach ($list as $row) {
+            foreach ($columns as $column) {
+                $type = $column->type ?? new TextType();
+                if ($type instanceof ImageType || $type->name === 'image') {
+                    $value = $row[$column->field] ?? '';
+                    if (!empty($value) && strpos((string)$value, 'http') === 0) {
+                        $url = (string)$value;
+                        // 检查文件是否已存在，如果不存在且不在待下载列表中，则加入待下载列表
+                        $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
+                        if (!file_exists($filePath) && !in_array($url, $imageUrls)) {
+                            $imageUrls[] = $url;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (empty($imageUrls)) {
+            return;
+        }
+
+        // 使用协程并发下载
+        $this->downloadImagesConcurrently($imageUrls, $config);
+    }
+
+    /**
+     * 协程并发下载图片
+     *
+     * @param array $urls
+     * @param ExportConfig $config
+     * @return void
+     */
+    protected function downloadImagesConcurrently(array $urls, ExportConfig $config)
+    {
+        $tempDir = $this->getTempDir();
+        $token = $config->getToken() ?: 'default';
+        
+        // 使用 token 创建子目录以隔离多个导出任务：临时目录/token/images
+        $imageDir = $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images';
+        if (!is_dir($imageDir)) {
+            if (!mkdir($imageDir, 0777, true)) {
+                throw new ExcelException('Failed to build image directory');
+            }
+        }
+
+        // 再次过滤已存在的文件（防止并发时重复下载）
+        $needDownloadUrls = [];
+        foreach ($urls as $url) {
+            $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
+            if (!file_exists($filePath)) {
+                $needDownloadUrls[] = $url;
+            }
+        }
+
+        if (empty($needDownloadUrls)) {
+            return;
+        }
+
+        // 获取批量下载阈值（默认 10）
+        $batchThreshold = $this->config['image_batch_threshold'] ?? 10;
+        $batchThreshold = max(1, (int)$batchThreshold); // 确保至少为 1
+
+        // 按阈值切割成多个批次
+        $batches = array_chunk($needDownloadUrls, $batchThreshold);
+
+        // 逐批次下载
+        foreach ($batches as $batch) {
+            // 判断是否在协程环境
+            if (Coroutine::inCoroutine()) {
+                // 使用 Hyperf Parallel 并发下载
+                $this->downloadImagesWithParallel($batch, $imageDir);
+            } else {
+                // 使用 Guzzle 异步请求下载
+                $this->downloadImagesWithGuzzle($batch, $imageDir);
+            }
+        }
+    }
+
+    /**
+     * 使用 Hyperf Parallel 并发下载图片（协程环境）
+     *
+     * @param array $urls
+     * @param string $imageDir
+     * @return void
+     */
+    protected function downloadImagesWithParallel(array $urls, string $imageDir)
+    {
+        $parallel = new Parallel();
+
+        // 为每个 URL 创建下载任务
+        foreach ($urls as $url) {
+            $parallel->add(function () use ($url, $imageDir) {
+                $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
+                
+                // 再次检查文件是否存在（防止并发时重复下载）
+                if (file_exists($filePath)) {
+                    return ['url' => $url, 'success' => true, 'path' => $filePath, 'skipped' => true];
+                }
+
+                try {
+                    $content = @file_get_contents($url, false, stream_context_create([
+                        'http' => [
+                            'timeout' => 30,
+                            'verify_peer' => false,
+                            'verify_peer_name' => false,
+                            'follow_location' => true,
+                            'max_redirects' => 5,
+                        ]
+                    ]));
+
+                    if ($content && @file_put_contents($filePath, $content)) {
+                        return ['url' => $url, 'success' => true, 'path' => $filePath];
+                    } else {
+                        return ['url' => $url, 'success' => false, 'path' => null];
+                    }
+                } catch (\Throwable $e) {
+                    return ['url' => $url, 'success' => false, 'path' => null, 'error' => $e->getMessage()];
+                }
+            });
+        }
+
+        // 等待所有任务完成（不需要缓存结果，直接下载到文件系统）
+        try {
+            $parallel->wait();
+        } catch (\Throwable $e) {
+            // 静默处理异常
+        }
+    }
+
+    /**
+     * 使用 Guzzle 异步请求下载图片（非协程环境）
+     *
+     * @param array $urls
+     * @param string $imageDir
+     * @return void
+     */
+    protected function downloadImagesWithGuzzle(array $urls, string $imageDir)
+    {
+        $client = new Client([
+            'timeout' => 30,
+            'verify' => false,
+            'http_errors' => false,
+        ]);
+
+        // 创建异步请求
+        $promises = [];
+        foreach ($urls as $url) {
+            $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
+            // 再次检查文件是否存在（防止并发时重复下载）
+            if (file_exists($filePath)) {
+                continue;
+            }
+            $promises[$url] = $client->requestAsync('GET', $url);
+        }
+
+        if (empty($promises)) {
+            return;
+        }
+
+        // 等待所有请求完成
+        try {
+            $responses = Utils::unwrap($promises);
+
+            foreach ($responses as $url => $response) {
+                $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
+
+                if ($response->getStatusCode() === 200) {
+                    $content = $response->getBody()->getContents();
+                    if ($content) {
+                        @file_put_contents($filePath, $content);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // 静默处理异常
+        }
     }
 
     abstract function exportExcel(ExportConfig $config, string $filePath): string;
