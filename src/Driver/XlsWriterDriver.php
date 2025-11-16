@@ -41,6 +41,22 @@ class XlsWriterDriver extends Driver
     public function __construct(protected ContainerInterface $container, protected array $config, protected string $name)
     {
         parent::__construct($container, $config, $name);
+        $this->checkPackageInstalled();
+    }
+
+    /**
+     * 检查 xlswriter 扩展是否已安装
+     *
+     * @return void
+     * @throws ExcelException
+     */
+    protected function checkPackageInstalled(): void
+    {
+        if (!class_exists(\Vtiful\Kernel\Excel::class)) {
+            throw new ExcelException(
+                'xlswriter extension is not installed. Please install it using: pecl install xlswriter'
+            );
+        }
     }
 
     /**
@@ -244,11 +260,8 @@ class XlsWriterDriver extends Driver
         $sheetData = [];
 
         if ($sheet->headerIndex > 0) {
-            if ($sheet->headerIndex > 1) {
-                // 跳过指定行
-                $excel->setSkipRows($sheet->headerIndex - 1);
-            }
-            $header = $excel->nextRow();
+            // 处理多行表头：从第1行到 headerIndex 行都读取，然后合并
+            $header = $this->readMultiRowHeader($excel, $sheetName, $sheet->headerIndex);
             $sheet->validateHeader($header);
         }
 
@@ -274,6 +287,64 @@ class XlsWriterDriver extends Driver
         $this->event->dispatch(new AfterImportSheet($config, $this, $sheet));
 
         return $sheetData;
+    }
+
+    /**
+     * 读取多行表头并合并
+     *
+     * @param Excel $excel
+     * @param string $sheetName sheet 名称
+     * @param int $headerIndex 表头结束行（从1开始）
+     * @return array
+     */
+    protected function readMultiRowHeader(Excel $excel, string $sheetName, int $headerIndex): array
+    {
+        // 读取所有表头行（从第1行到 headerIndex 行）
+        $headerRows = [];
+        for ($row = 1; $row <= $headerIndex; $row++) {
+            // 重新打开 sheet 并跳过前面的行
+            $excel->openSheet($sheetName);
+            if ($row > 1) {
+                $excel->setSkipRows($row - 1);
+            }
+            $headerRow = $excel->nextRow();
+            if ($headerRow !== null) {
+                $headerRows[] = $headerRow;
+            }
+        }
+        
+        if (empty($headerRows)) {
+            return [];
+        }
+        
+        // 合并多行表头：对于每一列，从最后一行向上查找，直到找到有值的为止
+        $maxCols = 0;
+        foreach ($headerRows as $row) {
+            $maxCols = max($maxCols, count($row));
+        }
+        
+        $mergedHeader = [];
+        for ($col = 0; $col < $maxCols; $col++) {
+            $value = '';
+            // 从最后一行（headerIndex行）向上查找到第一行
+            for ($rowIndex = count($headerRows) - 1; $rowIndex >= 0; $rowIndex--) {
+                $cellValue = $headerRows[$rowIndex][$col] ?? '';
+                $cellValue = trim((string)$cellValue);
+                if (!empty($cellValue)) {
+                    $value = $cellValue;
+                    break; // 找到有值的就停止，使用该值
+                }
+            }
+            $mergedHeader[] = $value;
+        }
+        
+        // 重新打开 sheet 并设置跳过 headerIndex 行，准备读取数据
+        $excel->openSheet($sheetName);
+        if ($headerIndex > 0) {
+            $excel->setSkipRows($headerIndex);
+        }
+        
+        return $mergedHeader;
     }
 
     /**
