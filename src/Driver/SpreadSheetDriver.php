@@ -612,18 +612,21 @@ class SpreadSheetDriver extends Driver
         $drawing->setPath($actualImagePath);
         $drawing->setCoordinates($cellCoordinate);
         
-        // 设置图片尺寸
-        // PhpSpreadsheet 的 setWidth 和 setHeight 使用像素单位，直接使用计算出的宽高
-        $drawing->setWidth($finalWidth);
-        $drawing->setHeight($finalHeight);
-        
         // 设置偏移量，使图片在单元格内显示
         $drawing->setOffsetX(2);
         $drawing->setOffsetY(2);
         
+        // 关键：必须先设置 setResizeProportional，然后再设置宽高
         // 如果用户明确设置了宽高或比例，禁用按比例缩放，使用精确的宽高
         // 如果四个字段都未设置（使用原始尺寸），则启用按比例缩放
+        // 注意：setResizeProportional(false) 必须在 setWidth 和 setHeight 之前调用
         $drawing->setResizeProportional(!$hasCustomSize);
+        
+        // 设置图片尺寸（必须在 setResizeProportional 之后）
+        // PhpSpreadsheet 的 setWidth 和 setHeight 使用像素单位，直接使用计算出的宽高
+        // 强制转换为整数，确保类型正确
+        $drawing->setWidth((int)$finalWidth);
+        $drawing->setHeight((int)$finalHeight);
         
         // 关键：先设置所有属性，最后再调用 setWorksheet
         // setWorksheet 会自动将 drawing 添加到 worksheet 的 drawing collection
