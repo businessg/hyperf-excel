@@ -31,8 +31,8 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Promise\Utils;
 use Hyperf\Coroutine\Parallel;
 use Vartruexuan\HyperfExcel\Data\Export\Column;
-use Vartruexuan\HyperfExcel\Data\Type\ImageType;
-use Vartruexuan\HyperfExcel\Data\Type\TextType;
+use Vartruexuan\HyperfExcel\Data\Export\Type\ImageType;
+use Vartruexuan\HyperfExcel\Data\Export\Type\TextType;
 
 abstract class Driver implements DriverInterface
 {

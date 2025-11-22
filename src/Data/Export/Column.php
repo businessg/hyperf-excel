@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Vartruexuan\HyperfExcel\Data\Export;
 
 use Vartruexuan\HyperfExcel\Data\BaseObject;
-use Vartruexuan\HyperfExcel\Data\Type\BaseType;
-use Vartruexuan\HyperfExcel\Data\Type\TextType;
+use Vartruexuan\HyperfExcel\Data\Export\Type\BaseType;
+use Vartruexuan\HyperfExcel\Data\Export\Type\TextType;
 
 /**
  * 列配置

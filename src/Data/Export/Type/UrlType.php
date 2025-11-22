@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel\Data\Type;
+namespace Vartruexuan\HyperfExcel\Data\Export\Type;
 
 /**
  * 链接类型

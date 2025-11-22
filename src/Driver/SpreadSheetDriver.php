@@ -23,7 +23,8 @@ use Vartruexuan\HyperfExcel\Data\Export\Style;
 use Vartruexuan\HyperfExcel\Data\Import\ImportConfig;
 use Vartruexuan\HyperfExcel\Data\Export\Sheet as ExportSheet;
 use Vartruexuan\HyperfExcel\Data\Import\Sheet as ImportSheet;
-use Vartruexuan\HyperfExcel\Data\Type\BaseType;
+use Vartruexuan\HyperfExcel\Data\Export\Type\BaseType;
+use Vartruexuan\HyperfExcel\Data\Export\InsertCellParam;
 use Vartruexuan\HyperfExcel\Event\AfterExportExcel;
 use Vartruexuan\HyperfExcel\Event\AfterExportSheet;
 use Vartruexuan\HyperfExcel\Event\AfterImportExcel;
@@ -352,10 +353,16 @@ class SpreadSheetDriver extends Driver
             foreach ($columns as $column) {
                 $value = $row[$column->field] ?? '';
                 $colIndex = $column->col + 1;
-                $type = $column->type ?? new \Vartruexuan\HyperfExcel\Data\Type\TextType();
 
                 // 根据类型插入单元格
-                $this->insertCell($worksheet, $type, $excelRowIndex, $colIndex, $value, $column, $config);
+                $param = new InsertCellParam([
+                    'rowIndex' => $excelRowIndex,
+                    'colIndex' => $colIndex,
+                    'value' => $value,
+                    'column' => $column,
+                    'config' => $config,
+                ]);
+                $this->insertCell($worksheet, $param);
             }
         }
     }
@@ -364,165 +371,147 @@ class SpreadSheetDriver extends Driver
      * 插入单元格
      *
      * @param Worksheet $worksheet
-     * @param BaseType $type
-     * @param int $rowIndex
-     * @param int $colIndex
-     * @param mixed $value
-     * @param Column $column
+     * @param InsertCellParam $param
      * @return void
      * @throws ExcelException
      */
-    protected function insertCell(Worksheet $worksheet, BaseType $type, int $rowIndex, int $colIndex, $value, Column $column, ExportConfig $config = null)
+    protected function insertCell(Worksheet $worksheet, InsertCellParam $param)
     {
+        $type = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'text');
         $dataType = $type->name;
         $methodName = 'insert' . ucfirst($dataType);
         if (!method_exists($this, $methodName)) {
             // 如果方法不存在，默认使用文本类型
-            $this->insertText($worksheet, $rowIndex, $colIndex, $value, $type, $column);
+            $this->insertText($worksheet, $param);
             return;
         }
 
-        call_user_func([$this, $methodName], $worksheet, $rowIndex, $colIndex, $value, $type, $column, $config);
+        call_user_func([$this, $methodName], $worksheet, $param);
     }
 
     /**
      * 插入文本
      *
      * @param Worksheet $worksheet
-     * @param int $rowIndex
-     * @param int $colIndex
-     * @param mixed $value
-     * @param BaseType $type
-     * @param Column $column
+     * @param InsertCellParam $param
      * @return void
      */
-    protected function insertText(Worksheet $worksheet, int $rowIndex, int $colIndex, $value, BaseType $type, Column $column)
+    protected function insertText(Worksheet $worksheet, InsertCellParam $param)
     {
-        $colStr = Coordinate::stringFromColumnIndex($colIndex);
-        $cell = $worksheet->getCell($colStr . $rowIndex);
-        $cell->setValue((string)$value);
+        $colStr = Coordinate::stringFromColumnIndex($param->colIndex);
+        $cell = $worksheet->getCell($colStr . $param->rowIndex);
+        $cell->setValue((string)$param->value);
 
         // 应用样式
-        $this->applyCellStyle($worksheet, $colStr . $rowIndex, $column, $type);
+        $type = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'text');
+        $this->applyCellStyle($worksheet, $colStr . $param->rowIndex, $param->column, $type);
     }
 
     /**
      * 插入链接
      *
      * @param Worksheet $worksheet
-     * @param int $rowIndex
-     * @param int $colIndex
-     * @param mixed $value
-     * @param BaseType $type
-     * @param Column $column
+     * @param InsertCellParam $param
      * @return void
      */
-    protected function insertUrl(Worksheet $worksheet, int $rowIndex, int $colIndex, $value, BaseType $type, Column $column)
+    protected function insertUrl(Worksheet $worksheet, InsertCellParam $param)
     {
-        $urlType = $type instanceof \Vartruexuan\HyperfExcel\Data\Type\UrlType ? $type : new \Vartruexuan\HyperfExcel\Data\Type\UrlType();
-        $url = (string)$value;
+        /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\UrlType $urlType */
+        $urlType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'url');
+        $url = (string)$param->value;
         $text = $urlType->text ?? $url;
 
-        $colStr = Coordinate::stringFromColumnIndex($colIndex);
-        $cell = $worksheet->getCell($colStr . $rowIndex);
+        $colStr = Coordinate::stringFromColumnIndex($param->colIndex);
+        $cell = $worksheet->getCell($colStr . $param->rowIndex);
         $cell->getHyperlink()->setUrl($url);
         $cell->setValue($text);
 
         // 应用样式
-        $this->applyCellStyle($worksheet, $colStr . $rowIndex, $column, $type);
+        $this->applyCellStyle($worksheet, $colStr . $param->rowIndex, $param->column, $urlType);
     }
 
     /**
      * 插入公式
      *
      * @param Worksheet $worksheet
-     * @param int $rowIndex
-     * @param int $colIndex
-     * @param mixed $value
-     * @param BaseType $type
-     * @param Column $column
+     * @param InsertCellParam $param
      * @return void
      */
-    protected function insertFormula(Worksheet $worksheet, int $rowIndex, int $colIndex, $value, BaseType $type, Column $column)
+    protected function insertFormula(Worksheet $worksheet, InsertCellParam $param)
     {
-        $formula = (string)$value;
-        $colStr = Coordinate::stringFromColumnIndex($colIndex);
-        $cell = $worksheet->getCell($colStr . $rowIndex);
+        $formula = (string)$param->value;
+        $colStr = Coordinate::stringFromColumnIndex($param->colIndex);
+        $cell = $worksheet->getCell($colStr . $param->rowIndex);
         $cell->setValue('=' . $formula);
 
         // 应用样式
-        $this->applyCellStyle($worksheet, $colStr . $rowIndex, $column, $type);
+        $type = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'formula');
+        $this->applyCellStyle($worksheet, $colStr . $param->rowIndex, $param->column, $type);
     }
 
     /**
      * 插入日期
      *
      * @param Worksheet $worksheet
-     * @param int $rowIndex
-     * @param int $colIndex
-     * @param mixed $value
-     * @param BaseType $type
-     * @param Column $column
+     * @param InsertCellParam $param
      * @return void
      */
-    protected function insertDate(Worksheet $worksheet, int $rowIndex, int $colIndex, $value, BaseType $type, Column $column)
+    protected function insertDate(Worksheet $worksheet, InsertCellParam $param)
     {
-        $dateType = $type instanceof \Vartruexuan\HyperfExcel\Data\Type\DateType ? $type : new \Vartruexuan\HyperfExcel\Data\Type\DateType();
-        $dateValue = $value;
+        /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\DateType $dateType */
+        $dateType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'date');
+        $dateValue = $param->value;
 
-        if (is_string($value)) {
-            $timestamp = strtotime($value);
+        if (is_string($param->value)) {
+            $timestamp = strtotime($param->value);
             $dateValue = $timestamp !== false ? $timestamp : time();
-        } elseif (!is_numeric($value)) {
+        } elseif (!is_numeric($param->value)) {
             $dateValue = time();
         }
 
-        $colStr = Coordinate::stringFromColumnIndex($colIndex);
-        $cell = $worksheet->getCell($colStr . $rowIndex);
+        $colStr = Coordinate::stringFromColumnIndex($param->colIndex);
+        $cell = $worksheet->getCell($colStr . $param->rowIndex);
         $excelDate = SharedDate::PHPToExcel($dateValue);
         $cell->setValue($excelDate);
 
         $dateFormat = $dateType->dateFormat ?? 'yyyy-mm-dd';
-        $cellStyle = $worksheet->getStyle($colStr . $rowIndex);
+        $cellStyle = $worksheet->getStyle($colStr . $param->rowIndex);
         $cellStyle->getNumberFormat()->setFormatCode($dateFormat);
 
         // 应用样式
-        $this->applyCellStyle($worksheet, $colStr . $rowIndex, $column, $type);
+        $this->applyCellStyle($worksheet, $colStr . $param->rowIndex, $param->column, $dateType);
     }
 
     /**
      * 插入图片
      *
      * @param Worksheet $worksheet
-     * @param int $rowIndex
-     * @param int $colIndex
-     * @param mixed $value
-     * @param BaseType $type
-     * @param Column $column
+     * @param InsertCellParam $param
      * @return void
      */
-    protected function insertImage(Worksheet $worksheet, int $rowIndex, int $colIndex, $value, BaseType $type, Column $column, ExportConfig $config = null)
+    protected function insertImage(Worksheet $worksheet, InsertCellParam $param)
     {
-        $imageType = $type instanceof \Vartruexuan\HyperfExcel\Data\Type\ImageType ? $type : new \Vartruexuan\HyperfExcel\Data\Type\ImageType();
-        $imagePath = (string)$value;
+        /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\ImageType $imageType */
+        $imageType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'image');
+        $imagePath = (string)$param->value;
         
         $hasCustomSize = ($imageType->width !== null || $imageType->height !== null || 
                          $imageType->widthScale !== null || $imageType->heightScale !== null);
 
-        $actualImagePath = $this->getActualImagePath($imagePath, $config);
+        $actualImagePath = $this->getActualImagePath($imagePath, $param->config);
         if ($actualImagePath === null) {
-            $this->insertText($worksheet, $rowIndex, $colIndex, $value, $type, $column);
+            $this->insertText($worksheet, $param);
             return;
         }
         
         $imagePath = $actualImagePath;
 
-        $colStr = Coordinate::stringFromColumnIndex($colIndex);
-        $cellCoordinate = $colStr . $rowIndex;
+        $colStr = Coordinate::stringFromColumnIndex($param->colIndex);
+        $cellCoordinate = $colStr . $param->rowIndex;
 
         $imageInfo = @getimagesize($imagePath);
         if (!$imageInfo) {
-            $this->insertText($worksheet, $rowIndex, $colIndex, $value, $type, $column);
+            $this->insertText($worksheet, $param);
             return;
         }
 
@@ -533,7 +522,7 @@ class SpreadSheetDriver extends Driver
         $finalWidth = $scales['width'];
         $finalHeight = $scales['height'];
 
-        $rowDimension = $worksheet->getRowDimension($rowIndex);
+        $rowDimension = $worksheet->getRowDimension($param->rowIndex);
         $currentRowHeight = $rowDimension->getRowHeight();
         if ($currentRowHeight === -1 || $currentRowHeight < $finalHeight / 1.33) {
             $rowDimension->setRowHeight($finalHeight / 1.33);
@@ -547,7 +536,7 @@ class SpreadSheetDriver extends Driver
         }
 
         self::$imageCounter++;
-        $token = $config ? $config->getToken() : null;
+        $token = $param->config ? $param->config->getToken() : null;
         if ($token === null) {
             throw new ExcelException('Token is required for image export');
         }
@@ -568,7 +557,7 @@ class SpreadSheetDriver extends Driver
         $actualImagePath = file_exists($tempImagePath) ? $tempImagePath : $imagePath;
         
         $drawing = new Drawing();
-        $uniqueName = 'Image_' . self::$imageCounter . '_' . $rowIndex . '_' . $colIndex;
+        $uniqueName = 'Image_' . self::$imageCounter . '_' . $param->rowIndex . '_' . $param->colIndex;
         $drawing->setName($uniqueName);
         $drawing->setDescription('Image ' . self::$imageCounter . ' at ' . $cellCoordinate);
         $drawing->setPath($actualImagePath);
@@ -700,7 +689,7 @@ class SpreadSheetDriver extends Driver
     protected function hasNonTextType(array $columns): bool
     {
         foreach ($columns as $column) {
-            $type = $column->type ?? new \Vartruexuan\HyperfExcel\Data\Type\TextType();
+            $type = $column->type ?? new \Vartruexuan\HyperfExcel\Data\Export\Type\TextType();
             if (is_string($type)) {
                 $type = BaseType::from($type);
             }
