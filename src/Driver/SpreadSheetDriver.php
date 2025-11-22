@@ -377,8 +377,7 @@ class SpreadSheetDriver extends Driver
      */
     protected function insertCell(Worksheet $worksheet, InsertCellParam $param)
     {
-        $type = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'text');
-        $dataType = $type->name;
+        $dataType = $param->column->type->name;
         $methodName = 'insert' . ucfirst($dataType);
         if (!method_exists($this, $methodName)) {
             // 如果方法不存在，默认使用文本类型
@@ -403,8 +402,7 @@ class SpreadSheetDriver extends Driver
         $cell->setValue((string)$param->value);
 
         // 应用样式
-        $type = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'text');
-        $this->applyCellStyle($worksheet, $colStr . $param->rowIndex, $param->column, $type);
+        $this->applyCellStyle($worksheet, $colStr . $param->rowIndex, $param->column, $param->column->type);
     }
 
     /**
@@ -417,7 +415,7 @@ class SpreadSheetDriver extends Driver
     protected function insertUrl(Worksheet $worksheet, InsertCellParam $param)
     {
         /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\UrlType $urlType */
-        $urlType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'url');
+        $urlType = $param->column->type;
         $url = (string)$param->value;
         $text = $urlType->text ?? $url;
 
@@ -445,8 +443,7 @@ class SpreadSheetDriver extends Driver
         $cell->setValue('=' . $formula);
 
         // 应用样式
-        $type = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'formula');
-        $this->applyCellStyle($worksheet, $colStr . $param->rowIndex, $param->column, $type);
+        $this->applyCellStyle($worksheet, $colStr . $param->rowIndex, $param->column, $param->column->type);
     }
 
     /**
@@ -459,7 +456,7 @@ class SpreadSheetDriver extends Driver
     protected function insertDate(Worksheet $worksheet, InsertCellParam $param)
     {
         /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\DateType $dateType */
-        $dateType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'date');
+        $dateType = $param->column->type;
         $dateValue = $param->value;
 
         if (is_string($param->value)) {
@@ -492,7 +489,7 @@ class SpreadSheetDriver extends Driver
     protected function insertImage(Worksheet $worksheet, InsertCellParam $param)
     {
         /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\ImageType $imageType */
-        $imageType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'image');
+        $imageType = $param->column->type;
         $imagePath = (string)$param->value;
         
         $hasCustomSize = ($imageType->width !== null || $imageType->height !== null || 

@@ -36,12 +36,12 @@ class Column extends BaseObject
 
     /**
      * 数据类型
-     * 可以是字符串（如 'text', 'url'）或类型对象（如 TextType, UrlType）
-     * 字符串会自动转换为对应的类型对象
+     * 可以是字符串（如 'text', 'url'）、数组或类型对象（如 TextType, UrlType）
+     * 字符串和数组会自动转换为对应的类型对象
      *
-     * @var string|BaseType
+     * @var string|array|BaseType
      */
-    public string|BaseType $type;
+    public string|array|BaseType $type;
     /**
      * 字段名
      *
@@ -137,13 +137,10 @@ class Column extends BaseObject
     {
         parent::__construct($config);
         
-        // 如果 type 是字符串，自动转换为类型对象
-        if (isset($this->type) && is_string($this->type)) {
-            $this->type = BaseType::from($this->type);
-        } elseif (!isset($this->type)) {
-            // 默认使用文本类型
-            $this->type = new TextType();
-        }
+        // 确保 type 一定有值且是 BaseType 实例
+        $this->type = ($this->type ?? new TextType()) instanceof BaseType 
+            ? $this->type 
+            : BaseType::from($this->type);
     }
 
     /**
@@ -185,16 +182,11 @@ class Column extends BaseObject
             $rowSpan = $hasChildren ? 1 : ($endRow - $startRow + 1);
             $colSpan = $hasChildren ? static::countLeafColumns($column->children) : 1;
 
-            // 处理 type，确保是类型对象
-            $type = $column->type ?? new TextType();
-            if (is_string($type)) {
-                $type = BaseType::from($type);
-            }
-
+            // type 会在 Column 构造函数中自动处理，确保是 BaseType 实例
             $columnInfo = new Column([
                 'title' => $column->title,
                 'field' => $column->field,
-                'type' => $type,
+                'type' => $column->type ?? new TextType(),
                 'callback' => $column->callback ?? null,
                 'row' => $startRow,
                 'width' => $column->width,

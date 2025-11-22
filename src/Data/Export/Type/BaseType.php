@@ -51,7 +51,7 @@ abstract class BaseType extends BaseObject
      * @param string|BaseType|array $type
      * @return BaseType
      */
-    public static function from($type): BaseType
+    public static function from(string|BaseType|array $type): BaseType
     {
         if ($type instanceof BaseType) {
             return $type;

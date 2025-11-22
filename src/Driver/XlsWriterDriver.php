@@ -557,8 +557,7 @@ class XlsWriterDriver extends Driver
      */
     protected function insertCell(Excel $excel, InsertCellParam $param)
     {
-        $type = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'text');
-        $dataType = $type->name;
+        $dataType = $param->column->type->name;
         $methodName = 'insert' . ucfirst($dataType);
         if (!method_exists($this, $methodName)) {
             // 如果方法不存在，默认使用文本类型
@@ -579,7 +578,7 @@ class XlsWriterDriver extends Driver
     protected function insertText(Excel $excel, InsertCellParam $param)
     {
         /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\TextType $textType */
-        $textType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'text');
+        $textType = $param->column->type;
         $format = $textType->format ?? null;
         $formatResource = $this->getCellFormat($excel, $param->column, $textType);
         $excel->insertText($param->rowIndex, $param->colIndex, (string)$param->value, $format, $formatResource);
@@ -595,7 +594,7 @@ class XlsWriterDriver extends Driver
     protected function insertUrl(Excel $excel, InsertCellParam $param)
     {
         /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\UrlType $urlType */
-        $urlType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'url');
+        $urlType = $param->column->type;
         $url = (string)$param->value;
         $text = $urlType->text ?? $url;
         $tooltip = $urlType->tooltip ?? null;
@@ -613,8 +612,7 @@ class XlsWriterDriver extends Driver
     protected function insertFormula(Excel $excel, InsertCellParam $param)
     {
         $formula = (string)$param->value;
-        $type = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'formula');
-        $formatResource = $this->getCellFormat($excel, $param->column, $type);
+        $formatResource = $this->getCellFormat($excel, $param->column, $param->column->type);
         $excel->insertFormula($param->rowIndex, $param->colIndex, $formula, $formatResource);
     }
 
@@ -628,7 +626,7 @@ class XlsWriterDriver extends Driver
     protected function insertDate(Excel $excel, InsertCellParam $param)
     {
         /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\DateType $dateType */
-        $dateType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'date');
+        $dateType = $param->column->type;
         $dateValue = $param->value;
         // 如果是字符串，尝试转换为时间戳
         if (is_string($param->value)) {
@@ -654,7 +652,7 @@ class XlsWriterDriver extends Driver
     protected function insertImage(Excel $excel, InsertCellParam $param)
     {
         /** @var \Vartruexuan\HyperfExcel\Data\Export\Type\ImageType $imageType */
-        $imageType = $param->column->type instanceof BaseType ? $param->column->type : BaseType::from($param->column->type ?? 'image');
+        $imageType = $param->column->type;
         $imagePath = (string)$param->value;
         
         $actualImagePath = $this->getActualImagePath($imagePath, $param->config);
