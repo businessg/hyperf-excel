@@ -656,50 +656,33 @@ class XlsWriterDriver extends Driver
      * @param mixed $value
      * @param BaseType $type
      * @param Column $column
+     * @param ExportConfig|null $config
      * @return void
+     * @throws ExcelException
      */
     protected function insertImage(Excel $excel, int $rowIndex, int $colIndex, $value, BaseType $type, Column $column, ExportConfig $config = null)
     {
         $imageType = $type instanceof \Vartruexuan\HyperfExcel\Data\Type\ImageType ? $type : new \Vartruexuan\HyperfExcel\Data\Type\ImageType();
         $imagePath = (string)$value;
         
-        // 如果是 URL，从文件系统中获取已下载的路径
-        if (strpos($imagePath, 'http') === 0) {
-            $originalUrl = $imagePath;
-            $tempDir = $this->getTempDir();
-            $token = $config ? ($config->getToken() ?: 'default') : 'default';
-            
-            // 根据 URL 计算文件路径：临时目录/token/images/md5(url)
-            $filePath = $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . md5($originalUrl);
-            
-            if (!file_exists($filePath)) {
-                // 文件不存在，使用文本
-                $this->insertText($excel, $rowIndex, $colIndex, $value, $type, $column);
-                return;
-            }
-            
-            $imagePath = $filePath;
-        }
-
-        // 检查文件是否存在
-        if (!file_exists($imagePath)) {
+        $actualImagePath = $this->getActualImagePath($imagePath, $config);
+        if ($actualImagePath === null) {
             $this->insertText($excel, $rowIndex, $colIndex, $value, $type, $column);
             return;
         }
+        
+        $imagePath = $actualImagePath;
 
-        // 获取原图尺寸
         $imageInfo = @getimagesize($imagePath);
         if (!$imageInfo) {
-            // 无法获取图片尺寸，使用默认值
             $widthScale = $imageType->widthScale ?? 1.0;
             $heightScale = $imageType->heightScale ?? 1.0;
-            $finalWidth = $imageType->width ?? 100; // 默认宽度（像素）
-            $finalHeight = $imageType->height ?? 100; // 默认高度（像素）
+            $finalWidth = $imageType->width ?? 100;
+            $finalHeight = $imageType->height ?? 100;
         } else {
             $originalWidth = $imageInfo[0];
             $originalHeight = $imageInfo[1];
             
-            // 计算宽高和比例（calculateScale 会确保四个字段都有值）
             $scales = $imageType->calculateScale($originalWidth, $originalHeight);
             $finalWidth = $scales['width'];
             $finalHeight = $scales['height'];
@@ -707,21 +690,14 @@ class XlsWriterDriver extends Driver
             $heightScale = $scales['heightScale'];
         }
 
-        // 调整单元格大小以容纳图片
-        // xlswriter 的行高单位是像素，列宽单位是字符宽度
-        // 行高：像素值（xlswriter 直接使用像素）
-        // 列宽：像素 / 7（大约 7 像素 = 1 个字符宽度），额外增加一些宽度以确保图片完整显示
-        $rowHeight = $finalHeight; // xlswriter 的行高直接使用像素
-        $colWidth = max(1, ceil($finalWidth / 7) + 2); // 列宽转换为字符宽度，额外增加 2 个字符宽度，至少为 1
+        $rowHeight = $finalHeight;
+        $colWidth = max(1, ceil($finalWidth / 7) + 2);
         
-        // 设置行高（xlswriter 的 setRow 第一个参数是范围字符串，第二个参数是高度）
-        // 注意：xlswriter 的行索引从 0 开始，但 Excel 行号从 1 开始，所以需要 +1
-        $excelRowIndex = $rowIndex + 1; // Excel 行号（从 1 开始）
+        $excelRowIndex = $rowIndex + 1;
         $colStr = Excel::stringFromColumnIndex($colIndex);
         $rowRange = "{$colStr}{$excelRowIndex}:{$colStr}{$excelRowIndex}";
         $excel->setRow($rowRange, $rowHeight);
         
-        // 设置列宽（xlswriter 的 setColumn 第一个参数是列范围字符串，第二个参数是宽度）
         $colRange = "{$colStr}:{$colStr}";
         $excel->setColumn($colRange, $colWidth);
 

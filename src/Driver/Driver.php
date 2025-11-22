@@ -6,11 +6,8 @@ namespace Vartruexuan\HyperfExcel\Driver;
 
 use Hyperf\Filesystem\FilesystemFactory;
 use League\Flysystem\Filesystem;
-use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
-use Psr\Container\NotFoundExceptionInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use Psr\Log\LoggerInterface;
 use Vartruexuan\HyperfExcel\Data\Export\ExportCallbackParam;
 use Vartruexuan\HyperfExcel\Data\Export\ExportConfig;
 use Vartruexuan\HyperfExcel\Data\Export\ExportData;
@@ -83,8 +80,7 @@ abstract class Driver implements DriverInterface
 
             $importData->sheetData = $this->importExcel($config);
 
-            // 删除临时文件
-            Helper::deleteFile($config->getTempPath());
+            $this->cleanCache($config->getTempPath(), $config->getToken());
 
         } catch (ExcelException $exception) {
 
@@ -111,7 +107,6 @@ abstract class Driver implements DriverInterface
         $filePath = $this->getTempFileName();
 
         if (!Helper::isUrl($path)) {
-            // 本地文件
             if (!is_file($path)) {
                 throw new ExcelException(sprintf('File not exists[%s]', $path));
             }
@@ -119,7 +114,6 @@ abstract class Driver implements DriverInterface
                 throw new ExcelException('File copy error');
             }
         } else {
-            // 远程文件
             if (!Helper::downloadFile($path, $filePath)) {
                 throw new ExcelException('File download error');
             }
@@ -264,19 +258,16 @@ abstract class Driver implements DriverInterface
      * @param string $filePath
      * @return string|Psr\Http\Message\ResponseInterface
      * @throws ExcelException
-     * @throws ContainerExceptionInterface
-     * @throws NotFoundExceptionInterface
      */
     protected function exportOutPut(ExportConfig $config, string $filePath): string|\Psr\Http\Message\ResponseInterface
     {
         $path = $this->buildExportPath($config);
         $fileName = basename($path);
         switch ($config->outPutType) {
-            // 上传
             case ExportConfig::OUT_PUT_TYPE_UPLOAD:
                 try {
                     $this->filesystem->writeStream($path, fopen($filePath, 'r+'));
-                    $this->deleteFile($filePath);
+                    $this->cleanCache($filePath, $config->getToken());
                 } catch (\Throwable $throwable) {
                     throw new ExcelException('File upload failed:' . $throwable->getMessage() . ',' . get_class($throwable));
                 }
@@ -286,7 +277,6 @@ abstract class Driver implements DriverInterface
 
                 return $path;
                 break;
-            // 直接输出
             case ExportConfig::OUT_PUT_TYPE_OUT:
                 $response = $this->container->get(\Hyperf\HttpServer\Contract\ResponseInterface::class);
                 $resp = $response->download($filePath, $fileName);
@@ -297,7 +287,7 @@ abstract class Driver implements DriverInterface
                 $resp->setHeader('Cache-Control', 'must-revalidate');
                 $resp->setHeader('Cache-Control', 'max-age=0');
                 $resp->setHeader('Pragma', 'public');
-                $this->deleteFile($filePath);
+                $this->cleanCache($filePath, $config->getToken());
                 return $resp;
                 break;
             default:
@@ -305,7 +295,7 @@ abstract class Driver implements DriverInterface
         }
     }
 
-    protected function deleteFile($filePath)
+    protected function deleteFile(string $filePath)
     {
         $callback = function () use ($filePath) {
             if (file_exists($filePath)) {
@@ -317,6 +307,130 @@ abstract class Driver implements DriverInterface
         } else {
             $callback();
         }
+    }
+
+    /**
+     * 清理缓存（文件 + 图片）
+     *
+     * @param string $filePath
+     * @param string $token
+     * @return void
+     * @throws ExcelException
+     */
+    protected function cleanCache(string $filePath, string $token): void
+    {
+        $this->deleteFile($filePath);
+        $this->cleanupImageCache($token);
+    }
+
+    /**
+     * 获取图片目录路径
+     *
+     * @param string $token
+     * @return string
+     * @throws ExcelException
+     */
+    protected function getImageDir(string $token): string
+    {
+        $tempDir = $this->getTempDir();
+        return $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images';
+    }
+
+    /**
+     * 获取图片文件路径
+     *
+     * @param string $token
+     * @param string $url 图片URL
+     * @return string
+     * @throws ExcelException
+     */
+    protected function getImageFilePath(string $token, string $url): string
+    {
+        $imageDir = $this->getImageDir($token);
+        return $imageDir . DIRECTORY_SEPARATOR . md5($url);
+    }
+
+    /**
+     * 获取单元格图片目录路径
+     *
+     * @param string $token
+     * @return string
+     * @throws ExcelException
+     */
+    protected function getCellImageDir(string $token): string
+    {
+        $imageDir = $this->getImageDir($token);
+        return $imageDir . DIRECTORY_SEPARATOR . 'cells';
+    }
+
+    /**
+     * 根据图片地址获取实际文件路径（如果存在）
+     *
+     * @param string $imagePath 图片地址（可能是 URL 或本地路径）
+     * @param ExportConfig|null $config 导出配置
+     * @return string|null 返回实际文件路径，如果文件不存在则返回 null
+     * @throws ExcelException
+     */
+    protected function getActualImagePath(string $imagePath, ?ExportConfig $config = null): ?string
+    {
+        if (str_starts_with($imagePath, 'http')) {
+            $token = $config ? $config->getToken() : null;
+            if ($token === null) {
+                return null;
+            }
+            $filePath = $this->getImageFilePath($token, $imagePath);
+            if (file_exists($filePath)) {
+                return $filePath;
+            }
+            return null;
+        }
+
+        if (file_exists($imagePath)) {
+            return $imagePath;
+        }
+
+        return null;
+    }
+
+    /**
+     * 清理缓存的图片
+     *
+     * @param string $token
+     * @return void
+     * @throws ExcelException
+     */
+    protected function cleanupImageCache(string $token): void
+    {
+        $imageDir = $this->getImageDir($token);
+        if (is_dir($imageDir)) {
+            $this->deleteDirectory($imageDir);
+        }
+    }
+
+    /**
+     * 递归删除目录及其所有内容
+     *
+     * @param string $dir
+     * @return bool
+     */
+    protected function deleteDirectory(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            return false;
+        }
+
+        $files = array_diff(scandir($dir), ['.', '..']);
+        
+        foreach ($files as $file) {
+            $path = $dir . DIRECTORY_SEPARATOR . $file;
+            if (is_dir($path)) {
+                $this->deleteDirectory($path);
+            } else {
+                @unlink($path);
+            }
+        }
+
+        return @rmdir($dir);
     }
 
     /**
@@ -351,24 +465,21 @@ abstract class Driver implements DriverInterface
      * @param array $list
      * @param ExportConfig $config
      * @return void
+     * @throws ExcelException
      */
     protected function batchDownloadImages(array $columns, array $list, ExportConfig $config)
     {
-        // 收集所有需要下载的图片 URL（去重）
         $imageUrls = [];
-        $token = $config->getToken() ?: 'default';
-        $tempDir = $this->getTempDir();
-        $imageDir = $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images';
+        $token = $config->getToken();
         
         foreach ($list as $row) {
             foreach ($columns as $column) {
                 $type = $column->type ?? new TextType();
                 if ($type instanceof ImageType || $type->name === 'image') {
                     $value = $row[$column->field] ?? '';
-                    if (!empty($value) && strpos((string)$value, 'http') === 0) {
+                    if (!empty($value) && str_starts_with((string)$value, 'http')) {
                         $url = (string)$value;
-                        // 检查文件是否已存在，如果不存在且不在待下载列表中，则加入待下载列表
-                        $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
+                        $filePath = $this->getImageFilePath($token, $url);
                         if (!file_exists($filePath) && !in_array($url, $imageUrls)) {
                             $imageUrls[] = $url;
                         }
@@ -381,7 +492,6 @@ abstract class Driver implements DriverInterface
             return;
         }
 
-        // 使用协程并发下载
         $this->downloadImagesConcurrently($imageUrls, $config);
     }
 
@@ -391,24 +501,20 @@ abstract class Driver implements DriverInterface
      * @param array $urls
      * @param ExportConfig $config
      * @return void
+     * @throws ExcelException
      */
     protected function downloadImagesConcurrently(array $urls, ExportConfig $config)
     {
-        $tempDir = $this->getTempDir();
-        $token = $config->getToken() ?: 'default';
+        $token = $config->getToken();
+        $imageDir = $this->getImageDir($token);
         
-        // 使用 token 创建子目录以隔离多个导出任务：临时目录/token/images
-        $imageDir = $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images';
-        if (!is_dir($imageDir)) {
-            if (!mkdir($imageDir, 0777, true)) {
-                throw new ExcelException('Failed to build image directory');
-            }
+        if (!is_dir($imageDir) && !mkdir($imageDir, 0777, true)) {
+            throw new ExcelException('Failed to build image directory');
         }
 
-        // 再次过滤已存在的文件（防止并发时重复下载）
         $needDownloadUrls = [];
         foreach ($urls as $url) {
-            $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
+            $filePath = $this->getImageFilePath($token, $url);
             if (!file_exists($filePath)) {
                 $needDownloadUrls[] = $url;
             }
@@ -418,22 +524,15 @@ abstract class Driver implements DriverInterface
             return;
         }
 
-        // 获取批量下载阈值（默认 10）
         $batchThreshold = $this->config['image_batch_threshold'] ?? 10;
-        $batchThreshold = max(1, (int)$batchThreshold); // 确保至少为 1
-
-        // 按阈值切割成多个批次
+        $batchThreshold = max(1, (int)$batchThreshold);
         $batches = array_chunk($needDownloadUrls, $batchThreshold);
 
-        // 逐批次下载
         foreach ($batches as $batch) {
-            // 判断是否在协程环境
             if (Coroutine::inCoroutine()) {
-                // 使用 Hyperf Parallel 并发下载
-                $this->downloadImagesWithParallel($batch, $imageDir);
+                $this->downloadImagesWithParallel($batch, $token);
             } else {
-                // 使用 Guzzle 异步请求下载
-                $this->downloadImagesWithGuzzle($batch, $imageDir);
+                $this->downloadImagesWithGuzzle($batch, $token);
             }
         }
     }
@@ -442,21 +541,20 @@ abstract class Driver implements DriverInterface
      * 使用 Hyperf Parallel 并发下载图片（协程环境）
      *
      * @param array $urls
-     * @param string $imageDir
+     * @param string $token
      * @return void
+     * @throws ExcelException
      */
-    protected function downloadImagesWithParallel(array $urls, string $imageDir)
+    protected function downloadImagesWithParallel(array $urls, string $token)
     {
         $parallel = new Parallel();
 
-        // 为每个 URL 创建下载任务
         foreach ($urls as $url) {
-            $parallel->add(function () use ($url, $imageDir) {
-                $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
+            $parallel->add(function () use ($url, $token) {
+                $filePath = $this->getImageFilePath($token, $url);
                 
-                // 再次检查文件是否存在（防止并发时重复下载）
                 if (file_exists($filePath)) {
-                    return ['url' => $url, 'success' => true, 'path' => $filePath, 'skipped' => true];
+                    return;
                 }
 
                 try {
@@ -470,22 +568,17 @@ abstract class Driver implements DriverInterface
                         ]
                     ]));
 
-                    if ($content && @file_put_contents($filePath, $content)) {
-                        return ['url' => $url, 'success' => true, 'path' => $filePath];
-                    } else {
-                        return ['url' => $url, 'success' => false, 'path' => null];
+                    if ($content) {
+                        @file_put_contents($filePath, $content);
                     }
                 } catch (\Throwable $e) {
-                    return ['url' => $url, 'success' => false, 'path' => null, 'error' => $e->getMessage()];
                 }
             });
         }
 
-        // 等待所有任务完成（不需要缓存结果，直接下载到文件系统）
         try {
             $parallel->wait();
         } catch (\Throwable $e) {
-            // 静默处理异常
         }
     }
 
@@ -493,10 +586,11 @@ abstract class Driver implements DriverInterface
      * 使用 Guzzle 异步请求下载图片（非协程环境）
      *
      * @param array $urls
-     * @param string $imageDir
+     * @param string $token
      * @return void
+     * @throws ExcelException
      */
-    protected function downloadImagesWithGuzzle(array $urls, string $imageDir)
+    protected function downloadImagesWithGuzzle(array $urls, string $token)
     {
         $client = new Client([
             'timeout' => 30,
@@ -504,11 +598,9 @@ abstract class Driver implements DriverInterface
             'http_errors' => false,
         ]);
 
-        // 创建异步请求
         $promises = [];
         foreach ($urls as $url) {
-            $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
-            // 再次检查文件是否存在（防止并发时重复下载）
+            $filePath = $this->getImageFilePath($token, $url);
             if (file_exists($filePath)) {
                 continue;
             }
@@ -519,12 +611,11 @@ abstract class Driver implements DriverInterface
             return;
         }
 
-        // 等待所有请求完成
         try {
             $responses = Utils::unwrap($promises);
 
             foreach ($responses as $url => $response) {
-                $filePath = $imageDir . DIRECTORY_SEPARATOR . md5($url);
+                $filePath = $this->getImageFilePath($token, $url);
 
                 if ($response->getStatusCode() === 200) {
                     $content = $response->getBody()->getContents();
@@ -534,7 +625,6 @@ abstract class Driver implements DriverInterface
                 }
             }
         } catch (\Throwable $e) {
-            // 静默处理异常
         }
     }
 

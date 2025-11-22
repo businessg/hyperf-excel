@@ -78,7 +78,7 @@ class SpreadSheetDriver extends Driver
         self::$imageCounter = 0;
         
         $spreadsheet = new Spreadsheet();
-        $spreadsheet->removeSheetByIndex(0); // 移除默认 sheet
+        $spreadsheet->removeSheetByIndex(0);
 
         $this->event->dispatch(new BeforeExportExcel($config, $this));
 
@@ -304,7 +304,7 @@ class SpreadSheetDriver extends Driver
 
         $page = 1;
         $pageNum = ceil($totalCount / $pageSize);
-        $currentRow = $maxDepth + 1; // header 之后的第一行
+        $currentRow = $maxDepth + 1;
 
         do {
             $list = $dataCallback = $data;
@@ -348,10 +348,10 @@ class SpreadSheetDriver extends Driver
     protected function insertDataByCell(Worksheet $worksheet, array $columns, array $list, int $startRow, ExportConfig $config = null)
     {
         foreach ($list as $rowIndex => $row) {
-            $excelRowIndex = $startRow + $rowIndex; // Excel 行索引（从1开始）
+            $excelRowIndex = $startRow + $rowIndex;
             foreach ($columns as $column) {
                 $value = $row[$column->field] ?? '';
-                $colIndex = $column->col + 1; // PhpSpreadsheet 列索引（从1开始）
+                $colIndex = $column->col + 1;
                 $type = $column->type ?? new \Vartruexuan\HyperfExcel\Data\Type\TextType();
 
                 // 根据类型插入单元格
@@ -470,7 +470,6 @@ class SpreadSheetDriver extends Driver
         $dateType = $type instanceof \Vartruexuan\HyperfExcel\Data\Type\DateType ? $type : new \Vartruexuan\HyperfExcel\Data\Type\DateType();
         $dateValue = $value;
 
-        // 如果是字符串，尝试转换为时间戳
         if (is_string($value)) {
             $timestamp = strtotime($value);
             $dateValue = $timestamp !== false ? $timestamp : time();
@@ -480,12 +479,9 @@ class SpreadSheetDriver extends Driver
 
         $colStr = Coordinate::stringFromColumnIndex($colIndex);
         $cell = $worksheet->getCell($colStr . $rowIndex);
-        
-        // PhpSpreadsheet 使用 Excel 日期格式（1900年1月1日为基准）
         $excelDate = SharedDate::PHPToExcel($dateValue);
         $cell->setValue($excelDate);
 
-        // 设置日期格式
         $dateFormat = $dateType->dateFormat ?? 'yyyy-mm-dd';
         $cellStyle = $worksheet->getStyle($colStr . $rowIndex);
         $cellStyle->getNumberFormat()->setFormatCode($dateFormat);
@@ -510,38 +506,20 @@ class SpreadSheetDriver extends Driver
         $imageType = $type instanceof \Vartruexuan\HyperfExcel\Data\Type\ImageType ? $type : new \Vartruexuan\HyperfExcel\Data\Type\ImageType();
         $imagePath = (string)$value;
         
-        // 记录用户是否设置了自定义尺寸（在 calculateScale 之前，因为 calculateScale 会更新属性）
         $hasCustomSize = ($imageType->width !== null || $imageType->height !== null || 
                          $imageType->widthScale !== null || $imageType->heightScale !== null);
 
-        // 如果是 URL，从文件系统中获取已下载的路径
-        if (strpos($imagePath, 'http') === 0) {
-            $originalUrl = $imagePath;
-            $tempDir = $this->getTempDir();
-            $token = $config ? ($config->getToken() ?: 'default') : 'default';
-            
-            // 根据 URL 计算文件路径：临时目录/token/images/md5(url)
-            $filePath = $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . md5($originalUrl);
-            
-            if (!file_exists($filePath)) {
-                // 文件不存在，使用文本
-                $this->insertText($worksheet, $rowIndex, $colIndex, $value, $type, $column);
-                return;
-            }
-            
-            $imagePath = $filePath;
-        }
-
-        // 检查文件是否存在
-        if (!file_exists($imagePath)) {
+        $actualImagePath = $this->getActualImagePath($imagePath, $config);
+        if ($actualImagePath === null) {
             $this->insertText($worksheet, $rowIndex, $colIndex, $value, $type, $column);
             return;
         }
+        
+        $imagePath = $actualImagePath;
 
         $colStr = Coordinate::stringFromColumnIndex($colIndex);
         $cellCoordinate = $colStr . $rowIndex;
 
-        // 获取原图尺寸
         $imageInfo = @getimagesize($imagePath);
         if (!$imageInfo) {
             $this->insertText($worksheet, $rowIndex, $colIndex, $value, $type, $column);
@@ -551,85 +529,55 @@ class SpreadSheetDriver extends Driver
         $originalWidth = $imageInfo[0];
         $originalHeight = $imageInfo[1];
 
-        // 计算宽高和比例（calculateScale 会确保四个字段都有值）
         $scales = $imageType->calculateScale($originalWidth, $originalHeight);
-        // SpreadSheetDriver 直接使用宽高设置图片
         $finalWidth = $scales['width'];
         $finalHeight = $scales['height'];
-        $widthScale = $scales['widthScale'];
-        $heightScale = $scales['heightScale'];
 
-        // 调整单元格大小以容纳图片
         $rowDimension = $worksheet->getRowDimension($rowIndex);
         $currentRowHeight = $rowDimension->getRowHeight();
-        if ($currentRowHeight === -1 || $currentRowHeight < $finalHeight / 1.33) { // 1.33 是像素到点的转换比例
+        if ($currentRowHeight === -1 || $currentRowHeight < $finalHeight / 1.33) {
             $rowDimension->setRowHeight($finalHeight / 1.33);
         }
 
         $colDimension = $worksheet->getColumnDimension($colStr);
         $currentColWidth = $colDimension->getWidth();
-        // 列宽计算：像素宽度 ÷ 7 ≈ 列宽（字符宽度），额外增加一些宽度以确保图片完整显示
-        $requiredColWidth = ($finalWidth / 7) + 1; // 额外增加 1 个字符宽度
+        $requiredColWidth = ($finalWidth / 7) + 1;
         if ($currentColWidth === -1 || $currentColWidth < $requiredColWidth) {
             $colDimension->setWidth($requiredColWidth);
         }
 
-        // 使用 token 目录创建图片副本（避免不同导出任务之间的冲突）
-        // PhpSpreadsheet 可能会根据路径去重，所以我们需要为每个单元格创建临时副本
-        // 但相同图片只下载一次，这里只是为每个单元格创建独立的文件引用
         self::$imageCounter++;
-        $tempDir = $this->getTempDir();
-        $token = $config ? ($config->getToken() ?: 'default') : 'default';
-        // 图片副本目录：临时目录/token/images/cells（用于存放单元格副本）
-        $cellImageDir = $tempDir . DIRECTORY_SEPARATOR . $token . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'cells';
+        $token = $config ? $config->getToken() : null;
+        if ($token === null) {
+            throw new ExcelException('Token is required for image export');
+        }
+        $cellImageDir = $this->getCellImageDir($token);
         if (!is_dir($cellImageDir)) {
             if (!mkdir($cellImageDir, 0777, true)) {
                 throw new ExcelException('Failed to build cell image directory');
             }
         }
         
-        // 为每个单元格创建唯一的图片副本（使用单元格坐标和计数器）
         $imageHash = md5($imagePath . $cellCoordinate . self::$imageCounter);
         $tempImagePath = $cellImageDir . DIRECTORY_SEPARATOR . 'img_' . $imageHash . '_' . basename($imagePath);
         
-        // 如果临时文件不存在，复制原图片
         if (!file_exists($tempImagePath)) {
             @copy($imagePath, $tempImagePath);
         }
         
-        // 使用临时文件路径，确保每个单元格都有独立的图片文件引用
         $actualImagePath = file_exists($tempImagePath) ? $tempImagePath : $imagePath;
         
-        // 创建图片对象（每次创建新实例，确保不会覆盖）
         $drawing = new Drawing();
-        
-        // 使用静态计数器确保每个图片都有唯一的索引和名称
         $uniqueName = 'Image_' . self::$imageCounter . '_' . $rowIndex . '_' . $colIndex;
         $drawing->setName($uniqueName);
         $drawing->setDescription('Image ' . self::$imageCounter . ' at ' . $cellCoordinate);
-        
-        // 设置路径（使用临时副本路径，确保每个单元格都有独立的文件引用）
         $drawing->setPath($actualImagePath);
         $drawing->setCoordinates($cellCoordinate);
-        
-        // 设置偏移量，使图片在单元格内显示
         $drawing->setOffsetX(2);
         $drawing->setOffsetY(2);
-        
-        // 关键：必须先设置 setResizeProportional，然后再设置宽高
-        // 如果用户明确设置了宽高或比例，禁用按比例缩放，使用精确的宽高
-        // 如果四个字段都未设置（使用原始尺寸），则启用按比例缩放
-        // 注意：setResizeProportional(false) 必须在 setWidth 和 setHeight 之前调用
         $drawing->setResizeProportional(!$hasCustomSize);
-        
-        // 设置图片尺寸（必须在 setResizeProportional 之后）
-        // PhpSpreadsheet 的 setWidth 和 setHeight 使用像素单位，直接使用计算出的宽高
-        // 强制转换为整数，确保类型正确
         $drawing->setWidth((int)$finalWidth);
         $drawing->setHeight((int)$finalHeight);
-        
-        // 关键：先设置所有属性，最后再调用 setWorksheet
-        // setWorksheet 会自动将 drawing 添加到 worksheet 的 drawing collection
         $drawing->setWorksheet($worksheet);
     }
 
