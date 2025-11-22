@@ -36,12 +36,12 @@ class Column extends BaseObject
 
     /**
      * 数据类型
-     * 可以是字符串（如 'text', 'url'）、数组或类型对象（如 TextType, UrlType）
-     * 字符串和数组会自动转换为对应的类型对象
+     * 可以是字符串（如 'text', 'url'）或类型对象（如 TextType, UrlType）
+     * 字符串会自动转换为对应的类型对象
      *
-     * @var string|array|BaseType
+     * @var string|BaseType
      */
-    public string|array|BaseType $type;
+    public string|BaseType $type;
     /**
      * 字段名
      *

@@ -46,21 +46,15 @@ abstract class BaseType extends BaseObject
     abstract public static function getName(): string;
 
     /**
-     * 从字符串创建类型对象
+     * 从字符串或类型对象创建类型对象
      *
-     * @param string|BaseType|array $type
+     * @param string|BaseType $type
      * @return BaseType
      */
-    public static function from(string|BaseType|array $type): BaseType
+    public static function from(string|BaseType $type): BaseType
     {
         if ($type instanceof BaseType) {
             return $type;
-        }
-
-        if (is_array($type)) {
-            $typeName = $type['name'] ?? $type['type'] ?? 'text';
-            $className = static::getTypeClass($typeName);
-            return new $className($type);
         }
 
         if (is_string($type)) {
