@@ -401,9 +401,10 @@ abstract class Driver implements DriverInterface
      */
     protected function cleanupImageCache(string $token): void
     {
-        $imageDir = $this->getImageDir($token);
-        if (is_dir($imageDir)) {
-            $this->deleteDirectory($imageDir);
+        $tempDir = $this->getTempDir();
+        $tokenDir = $tempDir . DIRECTORY_SEPARATOR . $token;
+        if (is_dir($tokenDir)) {
+            $this->deleteDirectory($tokenDir);
         }
     }
 
