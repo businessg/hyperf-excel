@@ -8,6 +8,21 @@
 
 Excel 同步/异步智能配置导入导出组件，为 Hyperf 框架提供强大的 Excel 处理能力。
 
+## 📑 目录
+
+- [组件能力](#-组件能力)
+- [安装](#-安装)
+- [使用指南](#-使用指南)
+- [配置类配置](#️-配置类配置)
+  - [ExportConfig 导出配置](#exportconfig-导出配置)
+  - [单元格类型](#单元格类型)
+  - [ImportConfig 导入配置](#importconfig-导入配置)
+- [组件配置](#组件配置)
+  - [驱动配置](#驱动配置)
+- [命令行](#命令行)
+- [DI 配置](#di)
+- [监听器](#监听器)
+
 ## ✨ 组件能力
 
 
@@ -17,22 +32,40 @@ Excel 同步/异步智能配置导入导出组件，为 Hyperf 框架提供强�
 - 📊 **进度追踪** - 实时获取处理进度信息
 - 💬 **消息系统** - 支持构建查询消息
 - 📄 **格式支持** - 支持 `xlsx` 格式
-- ⚙️ **驱动支持** - 基于 `xlswriter` 驱动
+- ⚙️ **驱动支持** - 基于 `xlswriter` 和 `PhpSpreadsheet` 驱动
+- 🔤 **单元格类型** - 支持文本、链接、公式、日期、图片等多种单元格类型
 
 ## 🚀 安装
 
 ### 前置准备
 
-安装依赖拓展 [xlswriter](https://xlswriter-docs.viest.me/zh-cn/an-zhuang)
+#### 驱动选择
 
-```bash
-pecl install xlswriter
-```
-- 依赖组件包 <项目中安装,构建配置>
-    - [hyperf/filesystem](https://hyperf.wiki/3.1/#/zh-cn/filesystem?id=%e5%ae%89%e8%a3%85)
-    - [hyperf/async-queue](https://hyperf.wiki/3.1/#/zh-cn/async-queue?id=%e5%bc%82%e6%ad%a5%e9%98%9f%e5%88%97)
-    - [hyperf/logger](https://hyperf.wiki/3.1/#/zh-cn/logger?id=%e6%97%a5%e5%bf%97)
-    - [hyperf/redis](https://hyperf.wiki/3.1/#/zh-cn/redis?id=redis)
+组件支持两种驱动，可根据需求选择：
+
+1. **xlswriter 驱动**（推荐，高性能）
+   - 需要安装 [xlswriter](https://xlswriter-docs.viest.me/zh-cn/an-zhuang) 扩展
+   ```bash
+   pecl install xlswriter
+   ```
+   - 性能优异，适合大数据量导出
+   - 支持文本、链接、公式、日期、图片类型
+
+2. **PhpSpreadsheet 驱动**（功能丰富）
+   - 需要安装 `phpoffice/phpspreadsheet` 包
+   ```bash
+   composer require phpoffice/phpspreadsheet
+   ```
+   - 功能更丰富，支持更多 Excel 特性
+   - 支持文本、链接、公式、日期、图片类型
+
+#### 依赖组件包
+
+以下组件需要在项目中安装并构建配置：
+- [hyperf/filesystem](https://hyperf.wiki/3.1/#/zh-cn/filesystem?id=%e5%ae%89%e8%a3%85)
+- [hyperf/async-queue](https://hyperf.wiki/3.1/#/zh-cn/async-queue?id=%e5%bc%82%e6%ad%a5%e9%98%9f%e5%88%97)
+- [hyperf/logger](https://hyperf.wiki/3.1/#/zh-cn/logger?id=%e6%97%a5%e5%bf%97)
+- [hyperf/redis](https://hyperf.wiki/3.1/#/zh-cn/redis?id=redis)
 ### 安装组件
 
 ```shell
@@ -83,6 +116,11 @@ $exportData = $excel->import(new DemoImportConfig()->setPath('/d/xxx.xlsx'));
  * @var \Vartruexuan\HyperfExcel\Progress\ProgressRecord $progressRecord
  */
 $progressRecord = $excel->getProgressRecord($token);
+
+// $progressRecord->status - 状态值：
+//   1.待处理 2.正在处理 3.处理完成 4.处理失败 5.输出中 6.完成
+// $progressRecord->progress - 总进度信息（包含 total, progress, success, fail 等）
+// $progressRecord->sheetProgress - 页码进度信息（数组）
 ```
 
 - 获取输出消息
@@ -96,11 +134,24 @@ $isEnd = false; // 是否结束
 $progressRecord = $excel->popMessageAndIsEnd($token, 50, $isEnd);
 ```
 
-## ⚙️配置类配置
+## ⚙️ 配置类配置
 
-### 导出
+### ExportConfig 导出配置
 
-- config
+`ExportConfig` 是导出配置的基类，继承它来创建自定义的导出配置。
+
+#### 主要属性说明
+
+- `$serviceName` - 服务名称，用于标识不同的导出服务
+- `$driverName` - 驱动名称（可选），可指定 `'xlswriter'` 或 `'spreadsheet'`，未指定则使用全局配置的默认驱动
+- `$isAsync` - 是否异步处理，`true` 为异步，`false` 为同步
+- `$outPutType` - 输出类型：
+  - `OUT_PUT_TYPE_UPLOAD` - 导出并上传到文件系统
+  - `OUT_PUT_TYPE_OUT` - 直接同步输出到浏览器
+- `$params` - 额外参数数组，可在数据回调中使用
+- `$sheets` - 工作表配置数组
+
+#### 完整配置示例
 
 ```php
 <?php
@@ -117,6 +168,11 @@ use Vartruexuan\HyperfExcel\Data\Export\SheetStyle;
 class DemoExportConfig extends ExportConfig
 {
     public string $serviceName = 'demo';
+
+    // 驱动名称（可选，未指定则使用配置中的默认驱动）
+    // 'xlswriter' - 使用 xlswriter 驱动（高性能，推荐）
+    // 'spreadsheet' - 使用 PhpSpreadsheet 驱动（功能丰富）
+    public string $driverName = ''; // 空字符串表示使用默认驱动
 
     // 是否异步
     public bool $isAsync = true;
@@ -200,7 +256,7 @@ class DemoExportConfig extends ExportConfig
 
 ```
 
-- Sheet 页码
+#### Sheet 工作表配置
 
 ```php
  new Sheet([
@@ -223,7 +279,7 @@ class DemoExportConfig extends ExportConfig
 ]),
 ```
 
-- Column 列
+#### Column 列配置
 
 ```php
  new Column([
@@ -233,6 +289,10 @@ class DemoExportConfig extends ExportConfig
       //'width' => 32,
       // 高度
       'height' => 58,
+      // 单元格类型（字符串或类型对象）
+      // 支持的类型：'text'（默认）、'url'、'formula'、'date'、'image'
+      // 或使用类型对象：new TextType(), new UrlType(), new DateType(), new ImageType() 等
+      'type' => 'text', // 或 Column::TYPE_TEXT
       // header 单元样式
       'headerStyle' => new Style([
           'wrap' => true,
@@ -258,7 +318,136 @@ class DemoExportConfig extends ExportConfig
 ]),
 ```
 
-- sheetStyle <页码样式>
+### 单元格类型
+
+组件支持多种单元格类型，可以通过 `Column` 的 `type` 属性配置。`type` 可以是字符串类型名或类型对象，构造函数会自动转换。
+
+#### 支持的类型
+
+1. **文本类型 (text)** - 默认类型
+```php
+new Column([
+    'title' => '用户名',
+    'field' => 'username',
+    'type' => 'text', // 或 Column::TYPE_TEXT
+    // 或使用类型对象
+    'type' => new \Vartruexuan\HyperfExcel\Data\Export\Type\TextType([
+        'format' => null, // 格式化字符串（xlswriter 驱动支持）
+    ]),
+])
+```
+
+2. **链接类型 (url)**
+```php
+new Column([
+    'title' => '网站',
+    'field' => 'website',
+    'type' => 'url', // 或 Column::TYPE_URL
+    // 或使用类型对象
+    'type' => new \Vartruexuan\HyperfExcel\Data\Export\Type\UrlType([
+        'text' => '点击访问', // 链接显示文字（为空则使用 URL 本身）
+        'tooltip' => '提示信息', // 链接提示（xlswriter 驱动支持）
+    ]),
+])
+```
+
+3. **公式类型 (formula)**
+```php
+new Column([
+    'title' => '合计',
+    'field' => 'total',
+    'type' => 'formula', // 或 Column::TYPE_FORMULA
+    // 或使用类型对象
+    'type' => new \Vartruexuan\HyperfExcel\Data\Export\Type\FormulaType(),
+])
+// 数据值应为公式字符串，如：'SUM(A1:A10)'
+```
+
+4. **日期类型 (date)**
+```php
+new Column([
+    'title' => '创建时间',
+    'field' => 'created_at',
+    'type' => 'date', // 或 Column::TYPE_DATE
+    // 或使用类型对象
+    'type' => new \Vartruexuan\HyperfExcel\Data\Export\Type\DateType([
+        'dateFormat' => 'yyyy-mm-dd', // 日期格式（SpreadSheet 驱动支持）
+    ]),
+])
+// 数据值可以是时间戳或日期字符串
+```
+
+5. **图片类型 (image)**
+```php
+new Column([
+    'title' => '头像',
+    'field' => 'avatar',
+    'type' => 'image', // 或 Column::TYPE_IMAGE
+    // 或使用类型对象
+    'type' => new \Vartruexuan\HyperfExcel\Data\Export\Type\ImageType([
+        'width' => 100, // 目标宽度（像素）
+        'height' => 100, // 目标高度（像素）
+        // 或使用缩放比例
+        'widthScale' => 0.5, // 宽度缩放比例
+        'heightScale' => 0.5, // 高度缩放比例
+    ]),
+])
+// 数据值应为图片路径（本地路径或 HTTP/HTTPS URL）
+// 支持自动下载远程图片并缓存
+// 如果图片不存在或下载失败，会自动降级为文本显示
+// 优先级：宽高 > 缩放比例，如果只设置一个维度，会保持宽高比
+```
+
+#### 类型常量
+
+```php
+use Vartruexuan\HyperfExcel\Data\Export\Column;
+
+Column::TYPE_TEXT    // 'text'
+Column::TYPE_URL     // 'url'
+Column::TYPE_FORMULA // 'formula'
+Column::TYPE_DATE    // 'date'
+Column::TYPE_IMAGE   // 'image'
+```
+
+#### 类型对象命名空间
+
+所有类型对象位于 `Vartruexuan\HyperfExcel\Data\Export\Type\` 命名空间下：
+
+- `TextType` - 文本类型
+- `UrlType` - 链接类型
+- `FormulaType` - 公式类型
+- `DateType` - 日期类型
+- `ImageType` - 图片类型
+- `BaseType` - 类型基类
+
+#### 类型自动转换
+
+`Column` 构造函数会自动处理类型转换：
+
+- 如果 `type` 未设置，默认使用 `TextType`
+- 如果 `type` 是字符串（如 `'text'`, `'url'`），会自动转换为对应的类型对象
+- 如果 `type` 已经是类型对象，直接使用
+
+因此，以下两种写法是等价的：
+
+```php
+// 使用字符串
+new Column([
+    'title' => '网站',
+    'field' => 'website',
+    'type' => 'url',
+])
+
+// 使用类型对象
+new Column([
+    'title' => '网站',
+    'field' => 'website',
+    'type' => new \Vartruexuan\HyperfExcel\Data\Export\Type\UrlType(),
+])
+```
+
+#### SheetStyle 工作表样式
 
 ```php
 new  \Vartruexuan\HyperfExcel\Data\Export\SheetStyle([
@@ -273,7 +462,7 @@ new  \Vartruexuan\HyperfExcel\Data\Export\SheetStyle([
 ])
 ```
 
-- style <列|单元格样式>
+#### Style 单元格样式
 
 ```php
 new Style([
@@ -285,9 +474,19 @@ new Style([
 ])
 ```
 
-### 导入
+### ImportConfig 导入配置
 
-- config
+`ImportConfig` 是导入配置的基类，继承它来创建自定义的导入配置。
+
+#### 主要属性说明
+
+- `$serviceName` - 服务名称，用于标识不同的导入服务
+- `$driverName` - 驱动名称（可选），可指定 `'xlswriter'` 或 `'spreadsheet'`，未指定则使用全局配置的默认驱动
+- `$isAsync` - 是否异步处理，`true` 为异步，`false` 为同步
+- `$path` - Excel 文件路径（本地路径或 URL）
+- `$sheets` - 工作表配置数组
+
+#### 完整配置示例
 
 ```php
 <?php
@@ -355,7 +554,7 @@ class DemoImportConfig extends AbstractImportConfig
 }
 ```
 
-- sheet
+#### Sheet 工作表配置
 
 ```php
 new Sheet([
@@ -377,7 +576,7 @@ new Sheet([
 
 ```
 
-- column
+#### Column 列配置
 
 ```php
 new Column([
@@ -392,17 +591,88 @@ new Column([
 
 ## 组件配置
 
+### 驱动配置
+
+组件支持两种驱动，可在全局配置中设置默认驱动，也可在具体的配置类中指定驱动。
+
+#### 全局驱动配置
+
+在 `config/autoload/excel.php` 中配置：
+
 ```php
 <?php
 
 declare(strict_types=1);
 
 return [
+    // 默认驱动：'xlswriter' 或 'spreadsheet'
     'default' => 'xlswriter',
     'drivers' => [
+        // xlswriter 驱动（高性能，需要安装 xlswriter 扩展）
         'xlswriter' => [
             'driver' => \Vartruexuan\HyperfExcel\Driver\XlsWriterDriver::class,
-        ]
+        ],
+        // PhpSpreadsheet 驱动（功能丰富，需要安装 phpoffice/phpspreadsheet 包）
+        'spreadsheet' => [
+            'driver' => \Vartruexuan\HyperfExcel\Driver\SpreadSheetDriver::class,
+        ],
+    ],
+```
+
+#### 配置类中指定驱动
+
+在 `ExportConfig` 或 `ImportConfig` 子类中，可以通过 `driverName` 属性指定使用的驱动：
+
+```php
+class DemoExportConfig extends ExportConfig
+{
+    // 指定使用 xlswriter 驱动
+    public string $driverName = 'xlswriter';
+    
+    // 或指定使用 PhpSpreadsheet 驱动
+    // public string $driverName = 'spreadsheet';
+    
+    // 如果不指定（空字符串），则使用全局配置中的默认驱动
+    // public string $driverName = '';
+}
+```
+
+#### 驱动特性对比
+
+| 特性 | xlswriter 驱动 | PhpSpreadsheet 驱动 |
+|------|---------------|-------------------|
+| **性能** | ⚡ 高性能，适合大数据量 | 🐌 性能一般 |
+| **内存占用** | 💚 低内存占用 | 💛 较高内存占用 |
+| **安装要求** | 需要安装 xlswriter 扩展 | 需要安装 phpoffice/phpspreadsheet 包 |
+| **单元格类型支持** | ✅ 全部支持 | ✅ 全部支持 |
+| **样式支持** | ✅ 基础样式 | ✅ 丰富样式 |
+| **图片处理** | ✅ 支持 | ✅ 支持 |
+| **公式支持** | ✅ 支持 | ✅ 支持 |
+| **日期格式** | ⚠️ 基础支持 | ✅ 完整支持 |
+| **链接提示** | ✅ 支持 tooltip | ❌ 不支持 tooltip |
+| **推荐场景** | 大数据量导出、生产环境 | 复杂样式需求、开发调试 |
+
+> **提示**：建议在生产环境使用 `xlswriter` 驱动以获得更好的性能，在需要复杂样式或调试时使用 `PhpSpreadsheet` 驱动。
+
+#### 完整配置示例
+
+```php
+<?php
+
+declare(strict_types=1);
+
+return [
+    // 默认驱动：'xlswriter' 或 'spreadsheet'
+    'default' => 'xlswriter',
+    'drivers' => [
+        // xlswriter 驱动（高性能，需要安装 xlswriter 扩展）
+        'xlswriter' => [
+            'driver' => \Vartruexuan\HyperfExcel\Driver\XlsWriterDriver::class,
+        ],
+        // PhpSpreadsheet 驱动（功能丰富，需要安装 phpoffice/phpspreadsheet 包）
+        'spreadsheet' => [
+            'driver' => \Vartruexuan\HyperfExcel\Driver\SpreadSheetDriver::class,
+        ],
     ],
     'options' => [
         // filesystem 配置
@@ -471,29 +741,48 @@ php bin/hyperf.php  excel:progress  424ee1bd6db248e09b514231edea5f04
 php bin/hyperf.php  excel:message  424ee1bd6db248e09b514231edea5f04
 ```
 
-## DI
+## 🔧 DI 配置
 
-- token 生成策略 <默认uuid4>
+### Token 生成策略
+
+默认使用 UUID4 策略，可在 `config/autoload/dependencies.php` 中自定义：
 
 ```php
-[
-    \Vartruexuan\HyperfExcel\Strategy\Token\TokenStrategyInterface::class => \Vartruexuan\HyperfExcel\Strategy\Token\UuidStrategy::class
-]
+<?php
+
+return [
+    // Token 生成策略（默认 uuid4）
+    \Vartruexuan\HyperfExcel\Strategy\Token\TokenStrategyInterface::class => 
+        \Vartruexuan\HyperfExcel\Strategy\Token\UuidStrategy::class,
+];
 ```
 
-- 导出文件名策略 <默认日期时间>
+### 导出文件名策略
+
+默认使用日期时间策略，可在 `config/autoload/dependencies.php` 中自定义：
 
 ```php
-[
-    \Vartruexuan\HyperfExcel\Strategy\Path\ExportPathStrategyInterface::class => \Vartruexuan\HyperfExcel\Strategy\Path\DateTimeExportPathStrategy::class
-]
+<?php
+
+return [
+    // 导出文件名策略（默认日期时间）
+    \Vartruexuan\HyperfExcel\Strategy\Path\ExportPathStrategyInterface::class => 
+        \Vartruexuan\HyperfExcel\Strategy\Path\DateTimeExportPathStrategy::class,
+];
 ```
-- 队列 <默认 async-queue>
+
+### 队列配置
+
+默认使用 async-queue，可在 `config/autoload/dependencies.php` 中自定义：
 
 ```php
-[
-    \Vartruexuan\HyperfExcel\Queue\ExcelQueueInterface::class => Vartruexuan\HyperfExcel\Queue\AsyncQueue\ExcelQueue::class
-]
+<?php
+
+return [
+    // 队列（默认 async-queue）
+    \Vartruexuan\HyperfExcel\Queue\ExcelQueueInterface::class => 
+        \Vartruexuan\HyperfExcel\Queue\AsyncQueue\ExcelQueue::class,
+];
 ```
 
 ## 监听器
@@ -537,7 +826,7 @@ CREATE TABLE `excel_log`
     `service_name`   varchar(20)  NOT NULL DEFAULT '' COMMENT '服务名',
     `sheet_progress` json                  DEFAULT NULL COMMENT '页码进度',
     `progress`       json                  DEFAULT NULL COMMENT '总进度信息',
-    `status`         tinyint unsigned NOT NULL DEFAULT '1' COMMENT '状态:1.待处理2.正在处理3.处理完成4.处理失败',
+    `status`         tinyint unsigned NOT NULL DEFAULT '1' COMMENT '状态:1.待处理2.正在处理3.处理完成4.处理失败5.输出中6.完成',
     `data`           json         NOT NULL COMMENT '数据信息',
     `remark`         varchar(500) NOT NULL DEFAULT '' COMMENT '备注',
     `url`            varchar(300) NOT NULL DEFAULT '' COMMENT 'url地址',
