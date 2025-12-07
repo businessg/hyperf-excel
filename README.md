@@ -19,6 +19,13 @@ Excel 同步/异步智能配置导入导出组件，为 Hyperf 框架提供强�
 - 📄 **格式支持** - 支持 `xlsx` 格式
 - ⚙️ **驱动支持** - 基于 `xlswriter` 驱动
 
+## 📚 使用示例
+
+我们提供了一个完整的使用示例项目，展示了如何在 Hyperf 框架中使用本包：
+
+- **项目地址**: [hyperf-excel-example](https://github.com/businessg/hyperf-excel-example)
+- **在线演示**: 访问 `http://你的域名/demo/index` 查看完整演示
+
 ## 🚀 安装
 
 ### 前置准备
