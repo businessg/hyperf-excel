@@ -41,7 +41,7 @@ class Column extends BaseObject
      *
      * @var string|BaseType
      */
-    public string|BaseType $type;
+    public string|BaseType $type = self::TYPE_TEXT;
     /**
      * 字段名
      *
@@ -136,10 +136,10 @@ class Column extends BaseObject
     public function __construct(array $config = [])
     {
         parent::__construct($config);
-        
+
         // 确保 type 一定有值且是 BaseType 实例
-        $this->type = ($this->type ?? new TextType()) instanceof BaseType 
-            ? $this->type 
+        $this->type = ($this->type ?? new TextType()) instanceof BaseType
+            ? $this->type
             : BaseType::from($this->type);
     }
 
