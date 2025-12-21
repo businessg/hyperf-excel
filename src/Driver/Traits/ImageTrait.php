@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel\Driver;
+namespace Vartruexuan\HyperfExcel\Driver\Traits;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Promise\Utils;
@@ -237,11 +237,21 @@ trait ImageTrait
                         
                         if ($response->getStatusCode() === 200) {
                             $content = $response->getBody()->getContents();
-                            if ($content) {
-                                @file_put_contents($filePath, $content);
+                            if ($content && strlen($content) > 0) {
+                                $dir = dirname($filePath);
+                                if (!is_dir($dir) && !mkdir($dir, 0777, true)) {
+                                    // 目录创建失败，跳过此图片
+                                    return;
+                                }
+                                if (@file_put_contents($filePath, $content) === false) {
+                                    // 文件写入失败，跳过此图片
+                                    return;
+                                }
                             }
                         }
                     } catch (\Throwable $e) {
+                        // 下载失败，跳过此图片（静默失败，避免影响整体导出）
+                        // 可以在日志中记录错误：$this->logger->error("Failed to download image: {$url}", ['error' => $e->getMessage()]);
                     }
                 });
             }
@@ -273,8 +283,16 @@ trait ImageTrait
 
                     if ($response->getStatusCode() === 200) {
                         $content = $response->getBody()->getContents();
-                        if ($content) {
-                            @file_put_contents($filePath, $content);
+                        if ($content && strlen($content) > 0) {
+                            $dir = dirname($filePath);
+                            if (!is_dir($dir) && !mkdir($dir, 0777, true)) {
+                                // 目录创建失败，跳过此图片
+                                continue;
+                            }
+                            if (@file_put_contents($filePath, $content) === false) {
+                                // 文件写入失败，跳过此图片
+                                continue;
+                            }
                         }
                     }
                 }

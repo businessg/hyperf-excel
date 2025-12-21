@@ -7,6 +7,11 @@ return [
     'drivers' => [
         'xlswriter' => [
             'driver' => \Vartruexuan\HyperfExcel\Driver\XlsWriterDriver::class,
+            // 固定内存模式配置
+            'const_memory' => [
+                'enable' => false, // 是否启用固定内存模式（默认关闭）
+                'enable_zip64' => true, // 是否启用 ZIP64（默认开启，WPS 需要关闭）
+            ],
         ]
     ],
     'options' => [

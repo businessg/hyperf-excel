@@ -611,6 +611,11 @@ return [
         // xlswriter 驱动（高性能，需要安装 xlswriter 扩展）
         'xlswriter' => [
             'driver' => \Vartruexuan\HyperfExcel\Driver\XlsWriterDriver::class,
+            // 固定内存模式配置（可选）
+            'const_memory' => [
+                'enable' => false, // 是否启用固定内存模式（默认关闭）
+                'enable_zip64' => true, // 是否启用 ZIP64（默认开启，WPS 需要关闭）
+            ],
         ],
         // PhpSpreadsheet 驱动（功能丰富，需要安装 phpoffice/phpspreadsheet 包）
         'spreadsheet' => [
@@ -654,6 +659,34 @@ class DemoExportConfig extends ExportConfig
 
 > **提示**：建议在生产环境使用 `xlswriter` 驱动以获得更好的性能，在需要复杂样式或调试时使用 `PhpSpreadsheet` 驱动。
 
+#### xlswriter 固定内存模式
+
+xlswriter 驱动支持固定内存模式，适用于大数据量导出场景。固定内存模式下，最大内存使用量 = 最大一行的数据占用量，可以显著降低内存占用。
+
+**配置方式：**
+
+```php
+'xlswriter' => [
+    'driver' => \Vartruexuan\HyperfExcel\Driver\XlsWriterDriver::class,
+    'const_memory' => [
+        'enable' => true, // 启用固定内存模式
+        'enable_zip64' => true, // 是否启用 ZIP64（默认开启，WPS 需要关闭）
+    ],
+],
+```
+
+**注意事项：**
+
+1. **内存优势**：固定内存模式下，内存使用量固定，不会随数据量增长而增长
+2. **功能限制**：
+   - 单元格按行落盘，如果当前操作的行已落盘则无法进行任何修改
+   - 只支持简单的单行表头，不支持复杂的合并单元格和多级表头
+   - 不支持单元格方式插入数据（非 text 类型），只能使用 data 方式批量写入
+3. **WPS 兼容性**：WPS 需要关闭 ZIP64（`enable_zip64 => false`），否则打开文件可能报文件损坏
+4. **适用场景**：适合大数据量、简单表头结构的导出场景
+
+**参考文档**：[xlswriter 固定内存模式文档](https://xlswriter-docs.viest.me/zh-cn/nei-cun/gu-ding-nei-cun-mo-shi)
+
 #### 完整配置示例
 
 ```php
@@ -668,6 +701,11 @@ return [
         // xlswriter 驱动（高性能，需要安装 xlswriter 扩展）
         'xlswriter' => [
             'driver' => \Vartruexuan\HyperfExcel\Driver\XlsWriterDriver::class,
+            // 固定内存模式配置（可选）
+            'const_memory' => [
+                'enable' => false, // 是否启用固定内存模式（默认关闭）
+                'enable_zip64' => true, // 是否启用 ZIP64（默认开启，WPS 需要关闭）
+            ],
         ],
         // PhpSpreadsheet 驱动（功能丰富，需要安装 phpoffice/phpspreadsheet 包）
         'spreadsheet' => [

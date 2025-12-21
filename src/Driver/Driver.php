@@ -27,7 +27,7 @@ use Vartruexuan\HyperfExcel\Data\Import\Sheet as ImportSheet;
 use Vartruexuan\HyperfExcel\Data\Export\Sheet as ExportSheet;
 use Vartruexuan\HyperfExcel\Strategy\Path\ExportPathStrategyInterface;
 use Hyperf\Coroutine\Coroutine;
-use Vartruexuan\HyperfExcel\Driver\ImageTrait;
+use Vartruexuan\HyperfExcel\Driver\Traits\ImageTrait;
 
 abstract class Driver implements DriverInterface
 {
