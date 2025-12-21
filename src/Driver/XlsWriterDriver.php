@@ -69,7 +69,6 @@ class XlsWriterDriver extends Driver
         }
 
         $excel->output();
-        $excel->close();
         $this->event->dispatch(new AfterExportExcel($config, $this));
 
         return $filePath;
