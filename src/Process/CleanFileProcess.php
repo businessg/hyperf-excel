@@ -55,7 +55,10 @@ class CleanFileProcess extends AbstractProcess
                     if (!$dir || !is_dir($dir) || in_array($dir, $dirs)) {
                         continue;
                     }
+                    // 清理临时文件
                     $this->cleanTempFile($dir);
+                    // 清理图片缓存
+                    $this->cleanupImageCache($dir);
                     $dirs[] = $dir;
                 } catch (\Throwable $exception) {
                     $this->logger->error('Cleaning temporary files failed:' . $exception->getMessage());
@@ -111,5 +114,81 @@ class CleanFileProcess extends AbstractProcess
             }
         }
         return $deletedFiles;
+    }
+
+    /**
+     * 清理图片缓存
+     * 清理指定临时目录下所有过期的 token 目录（包含图片缓存）
+     *
+     * @param string $tempDir 临时目录路径
+     * @return array 返回已删除的目录路径数组
+     */
+    public function cleanupImageCache(string $tempDir): array
+    {
+        $maxAgeSeconds = $this->configs['cleanTempFile']['time'] ?? 1800;
+        $deletedDirs = [];
+        $currentTime = time();
+
+        if (!is_dir($tempDir)) {
+            return $deletedDirs;
+        }
+
+        $items = scandir($tempDir);
+
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $itemPath = $tempDir . DIRECTORY_SEPARATOR . $item;
+
+            // 只处理目录（token 目录）
+            if (!is_dir($itemPath)) {
+                continue;
+            }
+
+            // 检查目录修改时间
+            $dirTime = filemtime($itemPath);
+            $ageSeconds = $currentTime - $dirTime;
+
+            // 如果目录超过指定时间，删除整个目录（包括其中的图片缓存）
+            if ($ageSeconds > $maxAgeSeconds) {
+                if ($this->deleteDirectory($itemPath)) {
+                    $deletedDirs[] = $itemPath;
+                }
+            }
+        }
+
+        return $deletedDirs;
+    }
+
+    /**
+     * 递归删除目录及其所有内容
+     *
+     * @param string $dir 要删除的目录路径
+     * @return bool 删除成功返回 true，失败返回 false
+     */
+    protected function deleteDirectory(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            return false;
+        }
+
+        $files = array_diff(scandir($dir), ['.', '..']);
+
+        foreach ($files as $file) {
+            $filePath = $dir . DIRECTORY_SEPARATOR . $file;
+
+            if (is_dir($filePath)) {
+                // 递归删除子目录
+                $this->deleteDirectory($filePath);
+            } else {
+                // 删除文件
+                Helper::deleteFile($filePath);
+            }
+        }
+
+        // 删除空目录
+        return @rmdir($dir);
     }
 }
