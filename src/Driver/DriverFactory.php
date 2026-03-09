@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Driver;
 
-use Vartruexuan\HyperfExcel\Exception\InvalidDriverException;
+use BusinessG\BaseExcel\Driver\DriverInterface;
+use BusinessG\BaseExcel\Exception\InvalidDriverException;
 use Hyperf\Contract\ConfigInterface;
 use Psr\Container\ContainerInterface;
 
@@ -12,17 +13,9 @@ use function Hyperf\Support\make;
 
 class DriverFactory
 {
-
-    /**
-     * @var DriverInterface[]
-     */
     protected array $drivers = [];
-
     protected array $configs = [];
 
-    /**
-     * @throws InvalidDriverException when the driver class not exist or the class is not implemented DriverInterface
-     */
     public function __construct(protected ContainerInterface $container)
     {
         $config = $container->get(ConfigInterface::class);
@@ -52,9 +45,6 @@ class DriverFactory
         return $this->get($name);
     }
 
-    /**
-     * @throws InvalidDriverException when the driver invalid
-     */
     public function get(string $name): DriverInterface
     {
         $driver = $this->drivers[$name] ?? null;

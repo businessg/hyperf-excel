@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Db;
 
+use BusinessG\BaseExcel\Data\BaseConfig;
+use BusinessG\BaseExcel\Data\Export\ExportConfig;
+use BusinessG\BaseExcel\Progress\ProgressData;
+use BusinessG\BaseExcel\Progress\ProgressInterface;
+use BusinessG\BaseExcel\Progress\ProgressRecord;
 use Hyperf\Contract\ConfigInterface;
-use Hyperf\Database\Model\Model;
 use Psr\Container\ContainerInterface;
-use Vartruexuan\HyperfExcel\Data\BaseConfig;
-use Vartruexuan\HyperfExcel\Data\Export\ExportConfig;
 use Vartruexuan\HyperfExcel\Db\Model\ExcelLog as ExcelLogModel;
-use Vartruexuan\HyperfExcel\Progress\ProgressData;
-use Vartruexuan\HyperfExcel\Progress\ProgressInterface;
-use Vartruexuan\HyperfExcel\Progress\ProgressRecord;
 
 class ExcelLogManager implements ExcelLogInterface
 {

@@ -2,27 +2,27 @@
 
 namespace Vartruexuan\HyperfExcel;
 
+use BusinessG\BaseExcel\Data\BaseConfig;
+use BusinessG\BaseExcel\Data\Export\ExportConfig;
+use BusinessG\BaseExcel\Data\Export\ExportData;
+use BusinessG\BaseExcel\Data\Import\ImportConfig;
+use BusinessG\BaseExcel\Data\Import\ImportData;
+use BusinessG\BaseExcel\Driver\DriverInterface;
+use BusinessG\BaseExcel\Event\AfterExport;
+use BusinessG\BaseExcel\Event\AfterImport;
+use BusinessG\BaseExcel\Event\BeforeExport;
+use BusinessG\BaseExcel\Event\BeforeImport;
+use BusinessG\BaseExcel\Event\Error;
+use BusinessG\BaseExcel\Exception\ExcelException;
+use BusinessG\BaseExcel\Progress\ProgressData;
+use BusinessG\BaseExcel\Progress\ProgressInterface;
+use BusinessG\BaseExcel\Progress\ProgressRecord;
+use BusinessG\BaseExcel\Queue\ExcelQueueInterface;
+use BusinessG\BaseExcel\Strategy\Token\TokenStrategyInterface;
 use Hyperf\Contract\ConfigInterface;
 use Psr\Container\ContainerInterface;
-use Vartruexuan\HyperfExcel\Data\BaseConfig;
-use Vartruexuan\HyperfExcel\Data\Export\ExportConfig;
-use Vartruexuan\HyperfExcel\Data\Export\ExportData;
-use Vartruexuan\HyperfExcel\Data\Import\ImportConfig;
-use Vartruexuan\HyperfExcel\Data\Import\ImportData;
-use Vartruexuan\HyperfExcel\Driver\DriverFactory;
-use Vartruexuan\HyperfExcel\Driver\DriverInterface;
-use Vartruexuan\HyperfExcel\Event\AfterExport;
-use Vartruexuan\HyperfExcel\Event\AfterImport;
-use Vartruexuan\HyperfExcel\Event\BeforeExport;
-use Vartruexuan\HyperfExcel\Event\BeforeImport;
-use Vartruexuan\HyperfExcel\Event\Error;
-use Vartruexuan\HyperfExcel\Exception\ExcelException;
-use Vartruexuan\HyperfExcel\Progress\ProgressData;
-use Vartruexuan\HyperfExcel\Progress\ProgressInterface;
-use Vartruexuan\HyperfExcel\Progress\ProgressRecord;
-use Vartruexuan\HyperfExcel\Queue\ExcelQueueInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use Vartruexuan\HyperfExcel\Strategy\Token\TokenStrategyInterface;
+use Vartruexuan\HyperfExcel\Driver\DriverFactory;
 
 class Excel implements ExcelInterface
 {
@@ -45,7 +45,6 @@ class Excel implements ExcelInterface
         $exportData = new ExportData(['token' => $config->getToken()]);
 
         try {
-
             $this->event->dispatch(new BeforeExport($config, $driver));
 
             if ($config->getIsAsync()) {
@@ -56,12 +55,15 @@ class Excel implements ExcelInterface
                 return $exportData;
             }
 
-            $exportData = $driver->export($config);
+            $driverResult = $driver->export($config);
+            $exportData = new ExportData([
+                'token' => $driverResult->token,
+                'response' => $driverResult->response,
+            ]);
 
             $this->event->dispatch(new AfterExport($config, $driver, $exportData));
 
             return $exportData;
-
         } catch (ExcelException $exception) {
             $this->event->dispatch(new Error($config, $driver, $exception));
             throw $exception;
@@ -89,12 +91,15 @@ class Excel implements ExcelInterface
                 return $importData;
             }
 
-            $importData = $driver->import($config);
+            $driverResult = $driver->import($config);
+            $importData = new ImportData([
+                'token' => $driverResult->token,
+                'sheetData' => $driverResult->sheetData,
+            ]);
 
             $this->event->dispatch(new AfterImport($config, $driver, $importData));
 
             return $importData;
-
         } catch (ExcelException $exception) {
             $this->event->dispatch(new Error($config, $driver, $exception));
             throw $exception;
@@ -114,9 +119,9 @@ class Excel implements ExcelInterface
         return $this->progress->popMessage($token, $num);
     }
 
-    public function pushMessage(string $token, string $message)
+    public function pushMessage(string $token, string $message): void
     {
-        return $this->progress->pushMessage($token, $message);
+        $this->progress->pushMessage($token, $message);
     }
 
     public function popMessageAndIsEnd(string $token, int $num = 50, bool &$isEnd = true): array
@@ -130,9 +135,9 @@ class Excel implements ExcelInterface
     public function isEnd(?ProgressRecord $progressRecord): bool
     {
         return empty($progressRecord) || in_array($progressRecord->progress->status, [
-                ProgressData::PROGRESS_STATUS_COMPLETE,
-                ProgressData::PROGRESS_STATUS_FAIL,
-            ]);
+            ProgressData::PROGRESS_STATUS_COMPLETE,
+            ProgressData::PROGRESS_STATUS_FAIL,
+        ]);
     }
 
     public function getDefaultDriver(): DriverInterface
@@ -154,22 +159,11 @@ class Excel implements ExcelInterface
         return $driver;
     }
 
-    /**
-     * 推送队列
-     *
-     * @param BaseConfig $config
-     * @return bool
-     */
-    protected function pushQueue(BaseConfig $config): bool
+    protected function pushQueue(BaseConfig $config): void
     {
-        return $this->container->get(ExcelQueueInterface::class)->push($config);
+        $this->container->get(ExcelQueueInterface::class)->push($config);
     }
 
-    /**
-     * token
-     *
-     * @return string
-     */
     protected function buildToken(): string
     {
         return $this->container->get(TokenStrategyInterface::class)->getToken();

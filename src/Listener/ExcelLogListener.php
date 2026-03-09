@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Listener;
 
-use Vartruexuan\HyperfExcel\Event\AfterExportOutput;
-use Vartruexuan\HyperfExcel\Event\BeforeExportOutput;
+use BusinessG\BaseExcel\Event\AfterExportOutput;
+use BusinessG\BaseExcel\Event\BeforeExportOutput;
 
 /**
  * 监听输出日志
