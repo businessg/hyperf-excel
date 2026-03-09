@@ -4,32 +4,29 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Command;
 
-use Psr\Container\ContainerInterface;
+use BusinessG\BaseExcel\Console\ProgressCommandHandler;
+use Hyperf\Command\Command as HyperfCommand;
 use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputOption;
 
-class ProgressCommand extends AbstractCommand
+class ProgressCommand extends HyperfCommand
 {
-    protected ContainerInterface $container;
-
-    public function __construct(ContainerInterface $container)
+    public function __construct(protected ProgressCommandHandler $handler)
     {
-        $this->container = $container;
         parent::__construct('excel:progress');
     }
 
-    public function handle()
+    public function handle(): int
     {
-        $token = $this->input->getArgument('token');
-        // 显示进度条
-        $this->showProgress($token);
+        return $this->handler->handle(
+            $this->input->getArgument('token'),
+            $this->output
+        );
     }
 
-    protected function configure()
+    protected function configure(): void
     {
         $this->setDescription('View progress information');
         $this->addArgument('token', InputArgument::REQUIRED, 'The token of excel.');
-
         $this->addUsage('excel:progress 168d8baf7fbc435c8ef18239e932b101');
     }
 }

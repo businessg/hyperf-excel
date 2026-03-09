@@ -6,11 +6,11 @@ namespace Vartruexuan\HyperfExcel;
 
 use RuntimeException;
 use Hyperf\Context\ApplicationContext;
-use Vartruexuan\HyperfExcel\Data\Export\ExportConfig;
-use Vartruexuan\HyperfExcel\Data\Export\ExportData;
-use Vartruexuan\HyperfExcel\Data\Import\ImportConfig;
-use Vartruexuan\HyperfExcel\Data\Import\ImportData;
-use Vartruexuan\HyperfExcel\Progress\ProgressRecord;
+use BusinessG\BaseExcel\Data\Export\ExportConfig;
+use BusinessG\BaseExcel\Data\Export\ExportData;
+use BusinessG\BaseExcel\Data\Import\ImportConfig;
+use BusinessG\BaseExcel\Data\Import\ImportData;
+use BusinessG\BaseExcel\Progress\ProgressRecord;
 
 function excel_export(ExportConfig $config): ExportData
 {

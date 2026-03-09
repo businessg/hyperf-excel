@@ -4,52 +4,33 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Command;
 
-use Psr\Container\ContainerInterface;
+use BusinessG\BaseExcel\Console\ExportCommandHandler;
+use Hyperf\Command\Command as HyperfCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
-use Vartruexuan\HyperfExcel\Data\Export\ExportConfig;
-use Vartruexuan\HyperfExcel\ExcelInterface;
 
-class ExportCommand extends AbstractCommand
+class ExportCommand extends HyperfCommand
 {
-    protected ContainerInterface $container;
-    protected ExcelInterface $excel;
-
-    public function __construct(ContainerInterface $container, ExcelInterface $excel)
+    public function __construct(protected ExportCommandHandler $handler)
     {
-        $this->container = $container;
-        $this->excel = $excel;
         parent::__construct('excel:export');
     }
 
-    public function handle()
+    public function handle(): int
     {
-        $config = $this->input->getArgument('config');
-        $progress = $this->input->getOption('progress');
-
-        /**
-         * @var ExportConfig $config
-         */
-        $config = new $config([]);
-        if (!$config instanceof ExportConfig) {
-            $this->error('Invalid config: expected instance of ' . ExportConfig::class);
-        }
-
-        $data = $this->excel->export($config);
-
-        $this->table(['token'], [[$data->token]]);
-
-        if ($progress) {
-            $this->showProgress($data->token);
-        }
+        $result = $this->handler->handle(
+            $this->input->getArgument('config'),
+            $this->input->getOption('progress'),
+            $this->output
+        );
+        return $result['exitCode'];
     }
 
-    protected function configure()
+    protected function configure(): void
     {
         $this->setDescription('Run export');
         $this->addArgument('config', InputArgument::REQUIRED, 'The config of export.');
         $this->addOption('progress', 'g', InputOption::VALUE_NEGATABLE, 'The progress of export.', true);
-
         $this->addUsage('excel:export "App\Excel\DemoExportConfig"');
         $this->addUsage('excel:export "App\Excel\DemoExportConfig" --no-progress');
     }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Db;
 
-use Vartruexuan\HyperfExcel\Data\BaseConfig;
+use BusinessG\BaseExcel\Data\BaseConfig;
 
 interface ExcelLogInterface
 {

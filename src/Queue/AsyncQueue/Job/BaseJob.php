@@ -7,10 +7,8 @@ namespace Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job;
 use Hyperf\AsyncQueue\Job;
 use Hyperf\Context\ApplicationContext;
 use Psr\Container\ContainerInterface;
-use Vartruexuan\HyperfExcel\Data\BaseConfig;
-use Vartruexuan\HyperfExcel\Driver\Driver;
-use Vartruexuan\HyperfExcel\Driver\DriverFactory;
-use Vartruexuan\HyperfExcel\Event\Error;
+use BusinessG\BaseExcel\Data\BaseConfig;
+use BusinessG\BaseExcel\Event\Error;
 use Vartruexuan\HyperfExcel\ExcelInterface;
 
 abstract class BaseJob extends Job

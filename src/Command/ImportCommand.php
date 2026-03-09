@@ -4,59 +4,37 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Command;
 
-use Psr\Container\ContainerInterface;
+use BusinessG\BaseExcel\Console\ImportCommandHandler;
+use Hyperf\Command\Command as HyperfCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
-use Vartruexuan\HyperfExcel\Data\Import\ImportConfig;
-use Vartruexuan\HyperfExcel\Driver\Driver;
-use Vartruexuan\HyperfExcel\ExcelInterface;
 
-class ImportCommand extends AbstractCommand
+class ImportCommand extends HyperfCommand
 {
-    protected ContainerInterface $container;
-    protected ExcelInterface $excel;
-
-    public function __construct(ContainerInterface $container, ExcelInterface $excel)
+    public function __construct(protected ImportCommandHandler $handler)
     {
-        $this->container = $container;
-        $this->excel = $excel;
         parent::__construct('excel:import');
     }
 
-    public function handle()
+    public function handle(): int
     {
-        $config = $this->input->getArgument('config');
-        $path = $this->input->getArgument('path');
-        $progress = $this->input->getOption('progress');
-
-        /**
-         * @var ImportConfig $config
-         */
-        $config = new $config([]);
-        if (!$config instanceof ImportConfig) {
-            $this->error('Invalid config: expected instance of ' . ImportConfig::class);
-        }
-        if ($path) {
-            $config->setPath($path);
-        }
-        $data = $this->excel->import($config);
-
-        $this->table(['token'], [[$data->token]]);
-
-        if ($progress) {
-            $this->showProgress( $data->token);
-        }
+        $result = $this->handler->handle(
+            $this->input->getArgument('config'),
+            $this->input->getArgument('path'),
+            $this->input->getOption('progress'),
+            $this->output
+        );
+        return $result['exitCode'];
     }
 
-    protected function configure()
+    protected function configure(): void
     {
         $this->setDescription('Run import');
         $this->addArgument('config', InputArgument::REQUIRED, 'The config of import.');
         $this->addArgument('path', InputArgument::REQUIRED, 'The file path of import.');
         $this->addOption('progress', 'g', InputOption::VALUE_NEGATABLE, 'The progress path of import.', true);
-
         $this->addUsage('excel:import "App\Excel\DemoImportConfig" "https://xxx.com/demo.xlsx"');
-        $this->addUsage('excel:import  "App\Excel\DemoImportConfig" "/excel/demo.xlsx"');
-        $this->addUsage('excel:import "App\Excel\DemoImportConfig"  "/excel/demo.xlsx" --no-progress');
+        $this->addUsage('excel:import "App\Excel\DemoImportConfig" "/excel/demo.xlsx"');
+        $this->addUsage('excel:import "App\Excel\DemoImportConfig" "/excel/demo.xlsx" --no-progress');
     }
 }

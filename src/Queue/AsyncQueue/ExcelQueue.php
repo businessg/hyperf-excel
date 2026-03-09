@@ -7,8 +7,8 @@ namespace Vartruexuan\HyperfExcel\Queue\AsyncQueue;
 use Hyperf\AsyncQueue\Driver\DriverInterface;
 use Hyperf\Contract\ConfigInterface;
 use Psr\Container\ContainerInterface;
-use Vartruexuan\HyperfExcel\Data\BaseConfig;
-use Vartruexuan\HyperfExcel\Data\Export\ExportConfig;
+use BusinessG\BaseExcel\Data\BaseConfig;
+use BusinessG\BaseExcel\Data\Export\ExportConfig;
 use Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job\ExportJob;
 use Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job\ImportJob;
 use Vartruexuan\HyperfExcel\Queue\ExcelQueueInterface;
@@ -27,10 +27,10 @@ class ExcelQueue implements ExcelQueueInterface
         $this->queue = $this->container->get(DriverFactory::class)->get($this->config['name'] ?? 'default');
     }
 
-    public function push(BaseConfig $config)
+    public function push(BaseConfig $config): void
     {
         $job = $config instanceof ExportConfig ? ExportJob::class : ImportJob::class;
-        return $this->queue->push(new $job($config));
+        $this->queue->push(new $job($config));
     }
 
 }

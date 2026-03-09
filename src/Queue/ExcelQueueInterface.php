@@ -1,12 +1,7 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Vartruexuan\HyperfExcel\Queue;
 
-use Vartruexuan\HyperfExcel\Data\BaseConfig;
-
-interface ExcelQueueInterface
+interface ExcelQueueInterface extends \BusinessG\BaseExcel\Queue\ExcelQueueInterface
 {
-    public function push(BaseConfig $config);
 }

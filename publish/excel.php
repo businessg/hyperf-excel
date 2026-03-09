@@ -27,11 +27,14 @@ return [
     'queue' => [
         'name' => 'default',
     ],
-    // 进度处理
+    // 进度处理（使用 base Progress + HyperfProgressStorage）
     'progress' => [
         'enable' => true,
         'prefix' => 'HyperfExcel',
         'expire' => 3600, // 数据失效时间
+        'redis' => [
+            'pool' => 'default',
+        ],
     ],
     // db日志
     'dbLog' => [
