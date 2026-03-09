@@ -11,7 +11,7 @@ use BusinessG\BaseExcel\Data\BaseConfig;
 use BusinessG\BaseExcel\Data\Export\ExportConfig;
 use Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job\ExportJob;
 use Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job\ImportJob;
-use Vartruexuan\HyperfExcel\Queue\ExcelQueueInterface;
+use BusinessG\BaseExcel\Queue\ExcelQueueInterface;
 use Hyperf\AsyncQueue\Driver\DriverFactory;
 
 class ExcelQueue implements ExcelQueueInterface

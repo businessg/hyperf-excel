@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job;
 
+use BusinessG\BaseExcel\Data\BaseConfig;
+use BusinessG\BaseExcel\Queue\ExcelJobTrait;
 use Hyperf\AsyncQueue\Job;
 use Hyperf\Context\ApplicationContext;
 use Psr\Container\ContainerInterface;
-use BusinessG\BaseExcel\Data\BaseConfig;
-use BusinessG\BaseExcel\Event\Error;
-use BusinessG\BaseExcel\ExcelInterface;
 
 abstract class BaseJob extends Job
 {
-    public BaseConfig $config;
+    use ExcelJobTrait;
+
     protected int $maxAttempts = 0;
 
     public function __construct(BaseConfig $config)
@@ -26,19 +26,10 @@ abstract class BaseJob extends Job
         return ApplicationContext::getContainer();
     }
 
-    protected function getExcel(): ExcelInterface
-    {
-        /**
-         * @var ExcelInterface $excel
-         */
-        return $this->getContainer()->get(ExcelInterface::class);
-    }
-
     public function fail(\Throwable $e): void
     {
-        $driver = $this->getExcel();
-        $driver->event->dispatch(new Error($this->config, $this->getExcel()->getDriver(), $e));
+        $this->dispatchError($e);
     }
 
-    abstract function handle();
+    abstract public function handle(): void;
 }

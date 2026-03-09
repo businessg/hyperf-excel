@@ -39,7 +39,7 @@ class ConfigProvider
     {
         return [
             'dependencies' => [
-                DriverInterface::class => ExcelInvoker::class,
+                DriverInterface::class => static fn (\Psr\Container\ContainerInterface $c) => $c->get(ExcelInvoker::class)($c),
                 ProgressStorageInterface::class => HyperfProgressStorage::class,
                 ProgressInterface::class => ProgressFactory::class,
                 ExcelLogInterface::class => ExcelLogManager::class,

@@ -18,9 +18,8 @@ class ExcelLogManager extends AbstractExcelLogManager
         ]);
     }
 
-    protected function performUpsert(array $saveParam): int
+    protected function getDefaultModelClass(): string
     {
-        $modelClass = $this->config['model'] ?? ExcelLogModel::class;
-        return $modelClass::query()->upsert([$saveParam], ['token']);
+        return ExcelLogModel::class;
     }
 }

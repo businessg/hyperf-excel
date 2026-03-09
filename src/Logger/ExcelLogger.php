@@ -4,33 +4,20 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Logger;
 
-use BusinessG\BaseExcel\Logger\ExcelLoggerInterface;
+use BusinessG\BaseExcel\Logger\AbstractExcelLogger;
 use Hyperf\Contract\ConfigInterface;
 use Hyperf\Logger\LoggerFactory;
-use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
-class ExcelLogger implements ExcelLoggerInterface
+class ExcelLogger extends AbstractExcelLogger
 {
-    protected LoggerInterface $logger;
-    protected array $config;
-
-    public function __construct(protected ContainerInterface $container)
+    protected function resolveConfig(): array
     {
-        $config = $this->container->get(ConfigInterface::class);
-        $this->config = $config->get('excel.logger', [
-            'name' => 'hyperf-excel',
-        ]);
-        $this->logger = $this->container->get(LoggerFactory::class)->get($this->config['name'] ?? 'hyperf-excel');
+        return $this->container->get(ConfigInterface::class)->get('excel.logger', ['name' => 'hyperf-excel']);
     }
 
-    public function getLogger(): LoggerInterface
+    protected function resolveLogger(): LoggerInterface
     {
-        return $this->logger;
-    }
-
-    public function getConfig(): array
-    {
-        return $this->config;
+        return $this->container->get(LoggerFactory::class)->get($this->config['name'] ?? 'hyperf-excel');
     }
 }

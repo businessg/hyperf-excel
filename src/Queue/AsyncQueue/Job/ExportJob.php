@@ -7,7 +7,7 @@ namespace Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job;
 class ExportJob extends BaseJob
 {
 
-    public function handle()
+    public function handle(): void
     {
         $this->getExcel()->export($this->config->setIsAsync(false));
     }

@@ -47,16 +47,11 @@ class CleanFileProcess extends AbstractProcess
     {
         $interval = $this->configs['cleanTempFile']['interval'] ?? 1800;
         $cleanTask = function () {
-            $dirs = [];
-            foreach ($this->configs['drivers'] as $key => $item) {
+            $driverFactory = $this->container->get(DriverFactory::class);
+            $dirs = Helper::getDirectoriesToClean($driverFactory);
+            foreach ($dirs as $dir) {
                 try {
-                    $driver = $this->container->get(DriverFactory::class)->get($key);
-                    $dir = $driver->getTempDir();
-                    if (!$dir || !is_dir($dir) || in_array($dir, $dirs)) {
-                        continue;
-                    }
                     $this->cleanTempFile($dir);
-                    $dirs[] = $dir;
                 } catch (\Throwable $exception) {
                     $this->logger->error('Cleaning temporary files failed:' . $exception->getMessage());
                 }
