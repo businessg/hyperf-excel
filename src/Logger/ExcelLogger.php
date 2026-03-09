@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Logger;
 
+use BusinessG\BaseExcel\Logger\ExcelLoggerInterface;
 use Hyperf\Contract\ConfigInterface;
 use Hyperf\Logger\LoggerFactory;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
-use Vartruexuan\HyperfExcel\Progress\ProgressInterface;
 
 class ExcelLogger implements ExcelLoggerInterface
 {

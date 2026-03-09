@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Db;
 
-use BusinessG\BaseExcel\Data\BaseConfig;
-
-interface ExcelLogInterface
+/**
+ * @deprecated Use BusinessG\BaseExcel\Db\ExcelLogInterface instead
+ */
+interface ExcelLogInterface extends \BusinessG\BaseExcel\Db\ExcelLogInterface
 {
-    public function saveLog(BaseConfig $config, array $saveParam = []): int;
-
-    public function getConfig(): array;
 }

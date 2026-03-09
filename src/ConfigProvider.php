@@ -21,12 +21,13 @@ use Vartruexuan\HyperfExcel\Command\ExportCommand;
 use Vartruexuan\HyperfExcel\Command\ImportCommand;
 use Vartruexuan\HyperfExcel\Command\MessageCommand;
 use Vartruexuan\HyperfExcel\Command\ProgressCommand;
-use Vartruexuan\HyperfExcel\Db\ExcelLogInterface;
+use BusinessG\BaseExcel\Db\ExcelLogInterface;
+use BusinessG\BaseExcel\ExcelInterface;
 use Vartruexuan\HyperfExcel\Db\ExcelLogManager;
 use Vartruexuan\HyperfExcel\Driver\DriverFactory;
 use Vartruexuan\HyperfExcel\Listener\ProgressListener;
 use Vartruexuan\HyperfExcel\Logger\ExcelLogger;
-use Vartruexuan\HyperfExcel\Logger\ExcelLoggerInterface;
+use BusinessG\BaseExcel\Logger\ExcelLoggerInterface;
 use Vartruexuan\HyperfExcel\Process\CleanFileProcess;
 use Vartruexuan\HyperfExcel\Progress\HyperfProgressStorage;
 use Vartruexuan\HyperfExcel\Progress\ProgressFactory;
@@ -43,7 +44,6 @@ class ConfigProvider
                 ProgressInterface::class => ProgressFactory::class,
                 ExcelLogInterface::class => ExcelLogManager::class,
                 ExcelInterface::class => Excel::class,
-                \BusinessG\BaseExcel\ExcelInterface::class => Excel::class,
                 ExcelLoggerInterface::class => ExcelLogger::class,
                 ExcelQueueInterface::class => ExcelQueue::class,
                 ExportPathStrategyInterface::class => DateTimeExportPathStrategy::class,

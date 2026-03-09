@@ -9,7 +9,7 @@ use Hyperf\Context\ApplicationContext;
 use Psr\Container\ContainerInterface;
 use BusinessG\BaseExcel\Data\BaseConfig;
 use BusinessG\BaseExcel\Event\Error;
-use Vartruexuan\HyperfExcel\ExcelInterface;
+use BusinessG\BaseExcel\ExcelInterface;
 
 abstract class BaseJob extends Job
 {

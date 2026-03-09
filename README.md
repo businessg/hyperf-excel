@@ -57,14 +57,14 @@ php bin/hyperf.php vendor:publish vartruexuan/hyperf-excel
 - excel对象
 
 ```php
-$excel = ApplicationContext::getContainer()->get(\Vartruexuan\HyperfExcel\ExcelInterface::class);
+$excel = ApplicationContext::getContainer()->get(\BusinessG\BaseExcel\ExcelInterface::class);
 ```
 
 - 导出
 
 ```php
 /**
- * @var \Vartruexuan\HyperfExcel\ExcelInterface $excel 
+ * @var \BusinessG\BaseExcel\ExcelInterface $excel 
  */
 $exportData = $excel->export(new DemoExportConfig([
     // 额外参数
@@ -76,7 +76,7 @@ $exportData = $excel->export(new DemoExportConfig([
 
 ```php
 /**
- * @var \Vartruexuan\HyperfExcel\ExcelInterface $excel 
+ * @var \BusinessG\BaseExcel\ExcelInterface $excel 
  * @
  */
 $exportData = $excel->import(new DemoImportConfig()->setPath('/d/xxx.xlsx'));
@@ -86,7 +86,7 @@ $exportData = $excel->import(new DemoImportConfig()->setPath('/d/xxx.xlsx'));
 
 ```php
 /**
- * @var \Vartruexuan\HyperfExcel\ExcelInterface $excel 
+ * @var \BusinessG\BaseExcel\ExcelInterface $excel 
  * @var \Vartruexuan\HyperfExcel\Progress\ProgressRecord $progressRecord
  */
 $progressRecord = $excel->getProgressRecord($token);
@@ -96,7 +96,7 @@ $progressRecord = $excel->getProgressRecord($token);
 
 ```php
 /**
- * @var \Vartruexuan\HyperfExcel\ExcelInterface $excel 
+ * @var \BusinessG\BaseExcel\ExcelInterface $excel 
  * @var \Vartruexuan\HyperfExcel\Progress\ProgressRecord $progressRecord
  */
 $isEnd = false; // 是否结束

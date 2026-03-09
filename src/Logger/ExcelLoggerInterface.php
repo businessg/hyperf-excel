@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Logger;
 
-use Psr\Log\LoggerInterface;
-
-interface ExcelLoggerInterface
+/**
+ * @deprecated Use BusinessG\BaseExcel\Logger\ExcelLoggerInterface instead
+ */
+interface ExcelLoggerInterface extends \BusinessG\BaseExcel\Logger\ExcelLoggerInterface
 {
-    public function getLogger(): LoggerInterface;
 }

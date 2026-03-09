@@ -46,4 +46,10 @@ class HyperfProgressStorage extends AbstractProgressStorage
         $value = $this->redis->rPop($key);
         return $value !== false ? (string) $value : null;
     }
+
+    public function lrange(string $key, int $start, int $stop): array
+    {
+        $result = $this->redis->lRange($key, $start, $stop);
+        return $result !== false ? array_map('strval', $result) : [];
+    }
 }

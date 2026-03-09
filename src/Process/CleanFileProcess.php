@@ -15,7 +15,7 @@ use BusinessG\BaseExcel\Helper\Helper;
 use Vartruexuan\HyperfExcel\Driver\DriverFactory;
 use Psr\Log\LoggerInterface;
 use Hyperf\Logger\LoggerFactory;
-use Vartruexuan\HyperfExcel\Logger\ExcelLoggerInterface;
+use BusinessG\BaseExcel\Logger\ExcelLoggerInterface;
 
 class CleanFileProcess extends AbstractProcess
 {
@@ -81,35 +81,12 @@ class CleanFileProcess extends AbstractProcess
     /**
      * 清理文件
      *
-     * @param $directory
+     * @param string $directory
      * @return array
      */
-    public function cleanTempFile($directory): array
+    public function cleanTempFile(string $directory): array
     {
         $maxAgeSeconds = $this->configs['cleanTempFile']['time'] ?? 1800;
-        $deletedFiles = [];
-        $currentTime = time();
-
-        $files = scandir($directory);
-
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-
-            $filePath = $directory . DIRECTORY_SEPARATOR . $file;
-
-            if (is_file($filePath)) {
-                $fileTime = filemtime($filePath);
-                $ageSeconds = $currentTime - $fileTime;
-
-                if ($ageSeconds > $maxAgeSeconds) {
-                    if (Helper::deleteFile($filePath)) {
-                        $deletedFiles[] = $filePath;
-                    }
-                }
-            }
-        }
-        return $deletedFiles;
+        return Helper::cleanTempDirectory($directory, $maxAgeSeconds);
     }
 }

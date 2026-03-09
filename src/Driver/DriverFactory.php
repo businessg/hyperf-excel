@@ -4,59 +4,21 @@ declare(strict_types=1);
 
 namespace Vartruexuan\HyperfExcel\Driver;
 
+use BusinessG\BaseExcel\Driver\AbstractDriverFactory;
 use BusinessG\BaseExcel\Driver\DriverInterface;
-use BusinessG\BaseExcel\Exception\InvalidDriverException;
 use Hyperf\Contract\ConfigInterface;
-use Psr\Container\ContainerInterface;
 
 use function Hyperf\Support\make;
 
-class DriverFactory
+class DriverFactory extends AbstractDriverFactory
 {
-    protected array $drivers = [];
-    protected array $configs = [];
-
-    public function __construct(protected ContainerInterface $container)
+    protected function getConfigValue(string $key, mixed $default = null): mixed
     {
-        $config = $container->get(ConfigInterface::class);
-
-        $options = $config->get('excel.options');
-        $this->configs = $config->get('excel.drivers', []);
-
-        foreach ($this->configs as $key => $item) {
-            $item = array_merge($options ?? [], $item);
-            $driverClass = $item['driver'];
-
-            if (!class_exists($driverClass)) {
-                throw new InvalidDriverException(sprintf('[Error] class %s is invalid.', $driverClass));
-            }
-
-            $driver = make($driverClass, ['config' => $item, 'name' => $key]);
-            if (!$driver instanceof DriverInterface) {
-                throw new InvalidDriverException(sprintf('[Error] class %s is not instanceof %s.', $driverClass, DriverInterface::class));
-            }
-
-            $this->drivers[$key] = $driver;
-        }
+        return $this->container->get(ConfigInterface::class)->get($key, $default);
     }
 
-    public function __get($name): DriverInterface
+    protected function makeDriver(string $class, array $params): DriverInterface
     {
-        return $this->get($name);
-    }
-
-    public function get(string $name): DriverInterface
-    {
-        $driver = $this->drivers[$name] ?? null;
-        if (!$driver instanceof DriverInterface) {
-            throw new InvalidDriverException(sprintf('[Error]  %s is a invalid driver.', $name));
-        }
-
-        return $driver;
-    }
-
-    public function getConfig($name): array
-    {
-        return $this->configs[$name] ?? [];
+        return make($class, $params);
     }
 }
