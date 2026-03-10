@@ -37,15 +37,44 @@ Hyperf 框架的 Excel 同步/异步导入导出组件。基于 [businessg/base-
 
 | 依赖 | 版本 | 说明 |
 |---|---|---|
-| PHP | >= 8.1 | 需启用 mbstring 扩展 |
+| PHP | >= 8.1 | |
 | Hyperf | 3.x | |
 | Swoole | >= 5.0 | Hyperf 运行时 |
-| ext-xlswriter | * | Excel 读写驱动，`pecl install xlswriter` |
-| ext-redis | * | 进度追踪依赖 Redis |
-| Redis 服务 | 任意版本 | 需运行中 |
+| Redis 服务 | 任意版本 | 需运行中，用于进度存储和消息队列 |
 | MySQL | 5.7+ | 仅 `dbLog.enabled=true` 时需要 |
 
-### 1.2 安装
+### 1.2 PHP 扩展
+
+以下 PHP 扩展必须安装并启用：
+
+```bash
+# xlswriter — Excel 读写核心驱动
+pecl install xlswriter
+# 安装后在 php.ini 中添加：extension=xlswriter
+
+# redis — 进度追踪和消息队列依赖
+pecl install redis
+# 安装后在 php.ini 中添加：extension=redis
+
+# mbstring — 字符串处理（通常已内置）
+# 如未启用：apt install php-mbstring 或 yum install php-mbstring
+
+# swoole — Hyperf 运行时（通常已安装）
+pecl install swoole
+```
+
+验证扩展已安装：
+
+```bash
+php -m | grep -E "xlswriter|redis|mbstring|swoole"
+# 应输出：
+# mbstring
+# redis
+# swoole
+# xlswriter
+```
+
+### 1.3 安装
 
 ```bash
 composer require businessg/hyperf-excel
@@ -53,7 +82,135 @@ composer require businessg/hyperf-excel
 
 > 组件自带 `ConfigProvider`，Hyperf 安装后自动合并配置，无需手动注册。
 
-### 1.3 发布配置文件
+### 1.4 依赖组件说明
+
+以下 Composer 包由组件自动引入，无需手动安装。但部分包需要**确认已配置**：
+
+| 依赖包 | 用途 | 需要的配置 |
+|---|---|---|
+| `businessg/base-excel` | 核心库（自动安装） | 无 |
+| `hyperf/filesystem` | 导出文件存储 | 需配置 `config/autoload/file.php`，详见下方 |
+| `hyperf/redis` | 进度追踪、消息队列 | 需配置 `config/autoload/redis.php` |
+| `hyperf/async-queue` | 异步导入导出 | 需配置 `config/autoload/async_queue.php` |
+| `hyperf/logger` | 组件日志输出 | 需配置 `config/autoload/logger.php` |
+| `hyperf/event` | 路由注册（BootApplication 事件） | 无需额外配置 |
+| `hyperf/command` | CLI 命令（excel:export / excel:import） | 无 |
+| `hyperf/support` | 工具函数（`\Hyperf\Support\env()` 等） | 无 |
+| `league/flysystem` | 文件系统抽象层（base-excel 依赖） | 无需额外配置 |
+| `ramsey/uuid` | 生成任务 token | 无 |
+
+**重点检查项：**
+
+**1) Filesystem（文件系统）— 必须配置**
+
+`hyperf/filesystem` 需要配置文件存储。如果项目中尚未配置，需创建 `config/autoload/file.php`：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Hyperf\Filesystem\Adapter\LocalAdapterFactory;
+
+return [
+    'default' => 'local',
+    'storage' => [
+        'local' => [
+            'driver' => LocalAdapterFactory::class,
+            'root'   => BASE_PATH . '/runtime',
+        ],
+    ],
+];
+```
+
+> 如需存储到 OSS/S3 等云存储，安装对应 Flysystem 适配器包：
+> - 阿里云 OSS：`composer require hyperf/flysystem-oss`
+> - AWS S3：`composer require league/flysystem-aws-s3-v3`
+>
+> 然后在 `file.php` 中添加对应 storage 配置。
+
+**2) Redis — 必须配置**
+
+确认 `config/autoload/redis.php` 存在并配置正确：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+return [
+    'default' => [
+        'host'     => \Hyperf\Support\env('REDIS_HOST', '127.0.0.1'),
+        'auth'     => \Hyperf\Support\env('REDIS_AUTH', null),
+        'port'     => (int) \Hyperf\Support\env('REDIS_PORT', 6379),
+        'db'       => (int) \Hyperf\Support\env('REDIS_DB', 0),
+        'pool'     => [
+            'min_connections' => 1,
+            'max_connections' => 10,
+            'connect_timeout' => 10.0,
+            'wait_timeout'    => 3.0,
+        ],
+    ],
+];
+```
+
+**3) AsyncQueue（异步模式需要）**
+
+使用异步导入导出时，确认 `config/autoload/async_queue.php` 存在：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+return [
+    'default' => [
+        'driver'         => \Hyperf\AsyncQueue\Driver\RedisDriver::class,
+        'redis'          => ['pool' => 'default'],
+        'channel'        => '{queue}',
+        'timeout'        => 2,
+        'retry_seconds'  => 5,
+        'handle_timeout' => 600,
+        'processes'      => 1,
+        'concurrent'     => ['limit' => 5],
+    ],
+];
+```
+
+**4) Logger（日志通道）**
+
+确认 `config/autoload/logger.php` 中有对应通道：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Monolog\Handler\StreamHandler;
+use Monolog\Formatter\LineFormatter;
+
+return [
+    'default' => [
+        'handler' => [
+            'class'       => StreamHandler::class,
+            'constructor' => [
+                'stream' => BASE_PATH . '/runtime/logs/hyperf.log',
+                'level'  => Monolog\Level::Debug,
+            ],
+        ],
+        'formatter' => [
+            'class'       => LineFormatter::class,
+            'constructor' => [
+                'format'                => null,
+                'dateFormat'            => 'Y-m-d H:i:s',
+                'allowInlineLineBreaks' => true,
+            ],
+        ],
+    ],
+];
+```
+
+### 1.5 发布配置文件
 
 ```bash
 php bin/hyperf.php vendor:publish businessg/hyperf-excel
@@ -64,7 +221,7 @@ php bin/hyperf.php vendor:publish businessg/hyperf-excel
 - `config/autoload/excel.php` — 组件核心配置
 - `config/autoload/excel_business.php` — 业务导入导出配置
 
-### 1.4 数据库迁移
+### 1.6 数据库迁移
 
 启用数据库日志（`dbLog.enabled = true`）时手动执行建表 SQL：
 
