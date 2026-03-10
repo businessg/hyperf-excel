@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job;
+namespace BusinessG\HyperfExcel\Queue\AsyncQueue\Job;
 
 class ImportJob extends BaseJob
 {

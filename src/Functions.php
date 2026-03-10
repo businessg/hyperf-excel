@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel;
+namespace BusinessG\HyperfExcel;
 
 use BusinessG\BaseExcel\Data\Export\ExportConfig;
 use BusinessG\BaseExcel\Data\Export\ExportData;

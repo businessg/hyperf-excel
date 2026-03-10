@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel;
+namespace BusinessG\HyperfExcel;
 
 use BusinessG\BaseExcel\Contract\ConfigResolverInterface;
 use BusinessG\BaseExcel\Contract\RedisAdapterInterface;

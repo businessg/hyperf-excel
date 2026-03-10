@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel\Process;
+namespace BusinessG\HyperfExcel\Process;
 
 use Hyperf\Contract\ConfigInterface;
 use Hyperf\Coordinator\Constants;

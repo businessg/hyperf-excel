@@ -39,7 +39,7 @@ return [
     // db日志
     'dbLog' => [
         'enable' => true,
-        'model' => \Vartruexuan\HyperfExcel\Db\Model\ExcelLog::class,
+        'model' => \BusinessG\HyperfExcel\Db\Model\ExcelLog::class,
     ],
     // 清除临时文件
     'cleanTempFile' => [

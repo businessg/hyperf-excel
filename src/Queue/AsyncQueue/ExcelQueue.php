@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel\Queue\AsyncQueue;
+namespace BusinessG\HyperfExcel\Queue\AsyncQueue;
 
 use Hyperf\AsyncQueue\Driver\DriverInterface;
 use Hyperf\Contract\ConfigInterface;
 use Psr\Container\ContainerInterface;
 use BusinessG\BaseExcel\Data\BaseConfig;
 use BusinessG\BaseExcel\Data\Export\ExportConfig;
-use Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job\ExportJob;
-use Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job\ImportJob;
+use BusinessG\HyperfExcel\Queue\AsyncQueue\Job\ExportJob;
+use BusinessG\HyperfExcel\Queue\AsyncQueue\Job\ImportJob;
 use BusinessG\BaseExcel\Queue\ExcelQueueInterface;
 use Hyperf\AsyncQueue\Driver\DriverFactory;
 

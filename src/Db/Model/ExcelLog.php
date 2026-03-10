@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel\Db\Model;
+namespace BusinessG\HyperfExcel\Db\Model;
 
 use Hyperf\Database\Model\Model;
 

@@ -1,8 +1,8 @@
 # hyperf-excel
 
 [![php](https://img.shields.io/badge/php-%3E=8.1-brightgreen.svg?maxAge=2592000)](https://github.com/php/php-src)
-[![Latest Stable Version](https://img.shields.io/packagist/v/vartruexuan/hyperf-excel)](https://packagist.org/packages/vartruexuan/hyperf-excel)
-[![License](https://img.shields.io/packagist/l/vartruexuan/hyperf-excel)](https://github.com/vartruexuan/hyperf-excel)
+[![Latest Stable Version](https://img.shields.io/packagist/v/businessg/hyperf-excel)](https://packagist.org/packages/businessg/hyperf-excel)
+[![License](https://img.shields.io/packagist/l/businessg/hyperf-excel)](https://github.com/businessg/hyperf-excel)
 
 ## 📌 概述
 
@@ -43,13 +43,13 @@ pecl install xlswriter
 ### 安装组件
 
 ```shell
-composer require vartruexuan/hyperf-excel
+composer require businessg/hyperf-excel
 ```
 
 ### 构建配置
 
 ```shell
-php bin/hyperf.php vendor:publish vartruexuan/hyperf-excel
+php bin/hyperf.php vendor:publish businessg/hyperf-excel
 ```
 
 ## 🛠 使用指南
@@ -87,7 +87,7 @@ $exportData = $excel->import(new DemoImportConfig()->setPath('/d/xxx.xlsx'));
 ```php
 /**
  * @var \BusinessG\BaseExcel\ExcelInterface $excel 
- * @var \Vartruexuan\HyperfExcel\Progress\ProgressRecord $progressRecord
+ * @var \BusinessG\HyperfExcel\Progress\ProgressRecord $progressRecord
  */
 $progressRecord = $excel->getProgressRecord($token);
 ```
@@ -97,7 +97,7 @@ $progressRecord = $excel->getProgressRecord($token);
 ```php
 /**
  * @var \BusinessG\BaseExcel\ExcelInterface $excel 
- * @var \Vartruexuan\HyperfExcel\Progress\ProgressRecord $progressRecord
+ * @var \BusinessG\HyperfExcel\Progress\ProgressRecord $progressRecord
  */
 $isEnd = false; // 是否结束
 $progressRecord = $excel->popMessageAndIsEnd($token, 50, $isEnd);
@@ -114,12 +114,12 @@ $progressRecord = $excel->popMessageAndIsEnd($token, 50, $isEnd);
 
 namespace App\Excel\Export;
 
-use Vartruexuan\HyperfExcel\Data\Export\ExportConfig;
+use BusinessG\HyperfExcel\Data\Export\ExportConfig;
 
-use Vartruexuan\HyperfExcel\Data\Export\Column;
-use Vartruexuan\HyperfExcel\Data\Export\ExportCallbackParam;
-use Vartruexuan\HyperfExcel\Data\Export\Sheet;
-use Vartruexuan\HyperfExcel\Data\Export\SheetStyle;
+use BusinessG\HyperfExcel\Data\Export\Column;
+use BusinessG\HyperfExcel\Data\Export\ExportCallbackParam;
+use BusinessG\HyperfExcel\Data\Export\Sheet;
+use BusinessG\HyperfExcel\Data\Export\SheetStyle;
 
 class DemoExportConfig extends ExportConfig
 {
@@ -215,18 +215,18 @@ class DemoExportConfig extends ExportConfig
       'name' => 'sheet1',
       // 列配置
       'columns' => [ 
-         new \Vartruexuan\HyperfExcel\Data\Export\Column([]),
+         new \BusinessG\HyperfExcel\Data\Export\Column([]),
       ],
       // 数据数量
       'count' => 0, 
       // 数据(array|callback)
-      'data' => function(\Vartruexuan\HyperfExcel\Data\Export\ExportCallbackParam $callbackParam){
+      'data' => function(\BusinessG\HyperfExcel\Data\Export\ExportCallbackParam $callbackParam){
             return [];
       }, 
       // 分批导出数
       'pageSize' => 1, 
       // 页码样式
-      'style'=> new  \Vartruexuan\HyperfExcel\Data\Export\SheetStyle([]);
+      'style'=> new  \BusinessG\HyperfExcel\Data\Export\SheetStyle([]);
 ]),
 ```
 
@@ -268,9 +268,9 @@ class DemoExportConfig extends ExportConfig
 - sheetStyle <页码样式>
 
 ```php
-new  \Vartruexuan\HyperfExcel\Data\Export\SheetStyle([
+new  \BusinessG\HyperfExcel\Data\Export\SheetStyle([
    // 网格线
-   'gridline'=> \Vartruexuan\HyperfExcel\Data\Export\SheetStyle::GRIDLINES_HIDE_ALL,
+   'gridline'=> \BusinessG\HyperfExcel\Data\Export\SheetStyle::GRIDLINES_HIDE_ALL,
    // 缩放 (10 <= $scale <= 400)
    'zoom'=> 50,  
    // 隐藏当前页码 
@@ -301,12 +301,12 @@ new Style([
 
 namespace App\Excel\Import;
 
-use Vartruexuan\HyperfExcel\Data\Import\ImportConfig;
+use BusinessG\HyperfExcel\Data\Import\ImportConfig;
 use App\Exception\BusinessException;
 use Hyperf\Collection\Arr;
-use Vartruexuan\HyperfExcel\Data\Import\ImportRowCallbackParam;
-use Vartruexuan\HyperfExcel\Data\Import\Sheet;
-use Vartruexuan\HyperfExcel\Data\Import\Column;
+use BusinessG\HyperfExcel\Data\Import\ImportRowCallbackParam;
+use BusinessG\HyperfExcel\Data\Import\Sheet;
+use BusinessG\HyperfExcel\Data\Import\Column;
 
 class DemoImportConfig extends AbstractImportConfig
 {
@@ -379,7 +379,7 @@ new Sheet([
           ]),
     ],
     // 数据回调
-    'callback' => function(\Vartruexuan\HyperfExcel\Data\Import\ImportRowCallbackParam $callbackParam){}
+    'callback' => function(\BusinessG\HyperfExcel\Data\Import\ImportRowCallbackParam $callbackParam){}
 ])
 
 ```
@@ -408,7 +408,7 @@ return [
     'default' => 'xlswriter',
     'drivers' => [
         'xlswriter' => [
-            'driver' => \Vartruexuan\HyperfExcel\Driver\XlsWriterDriver::class,
+            'driver' => \BusinessG\HyperfExcel\Driver\XlsWriterDriver::class,
         ]
     ],
     'options' => [
@@ -438,7 +438,7 @@ return [
     // db日志
     'dbLog' => [
         'enable' => true,
-        'model' => \Vartruexuan\HyperfExcel\Db\Model\ExcelLog::class,
+        'model' => \BusinessG\HyperfExcel\Db\Model\ExcelLog::class,
     ],
     // 清除临时文件
     'cleanTempFile' => [
@@ -484,7 +484,7 @@ php bin/hyperf.php  excel:message  424ee1bd6db248e09b514231edea5f04
 
 ```php
 [
-    \Vartruexuan\HyperfExcel\Strategy\Token\TokenStrategyInterface::class => \Vartruexuan\HyperfExcel\Strategy\Token\UuidStrategy::class
+    \BusinessG\HyperfExcel\Strategy\Token\TokenStrategyInterface::class => \BusinessG\HyperfExcel\Strategy\Token\UuidStrategy::class
 ]
 ```
 
@@ -492,14 +492,14 @@ php bin/hyperf.php  excel:message  424ee1bd6db248e09b514231edea5f04
 
 ```php
 [
-    \Vartruexuan\HyperfExcel\Strategy\Path\ExportPathStrategyInterface::class => \Vartruexuan\HyperfExcel\Strategy\Path\DateTimeExportPathStrategy::class
+    \BusinessG\HyperfExcel\Strategy\Path\ExportPathStrategyInterface::class => \BusinessG\HyperfExcel\Strategy\Path\DateTimeExportPathStrategy::class
 ]
 ```
 - 队列 <默认 async-queue>
 
 ```php
 [
-    \Vartruexuan\HyperfExcel\Queue\ExcelQueueInterface::class => Vartruexuan\HyperfExcel\Queue\AsyncQueue\ExcelQueue::class
+    \BusinessG\HyperfExcel\Queue\ExcelQueueInterface::class => BusinessG\HyperfExcel\Queue\AsyncQueue\ExcelQueue::class
 ]
 ```
 
@@ -510,7 +510,7 @@ php bin/hyperf.php  excel:message  424ee1bd6db248e09b514231edea5f04
 ```php
 // config/autoload/listeners.php
 return [
-    Vartruexuan\HyperfExcel\Listener\ExcelLogListener::class,
+    BusinessG\HyperfExcel\Listener\ExcelLogListener::class,
 ];
 ```
 
@@ -519,14 +519,14 @@ return [
 ```php
 // config/autoload/listeners.php
 return [
-    Vartruexuan\HyperfExcel\Listener\ExcelLogDbListener::class,
+    BusinessG\HyperfExcel\Listener\ExcelLogDbListener::class,
 ];
 ```
 
 - 构建数据库表
 
 ```bash
-php bin/hyperf.php migrate  --path=./vendor/vartruexuan/hyperf-excel/src/migrations
+php bin/hyperf.php migrate  --path=./vendor/businessg/hyperf-excel/src/migrations
 ```
 
 或
@@ -534,12 +534,12 @@ php bin/hyperf.php migrate  --path=./vendor/vartruexuan/hyperf-excel/src/migrati
 直接执行组件里对应的SQL文件：
 
 ```bash
-# SQL文件路径: vendor/vartruexuan/hyperf-excel/src/migrations/excel_log.sql
+# SQL文件路径: vendor/businessg/hyperf-excel/src/migrations/excel_log.sql
 ```
 
 ### 自定义监听器
 
-- 继承`Vartruexuan\HyperfExcel\Listener\BaseListener`
+- 继承`BusinessG\HyperfExcel\Listener\BaseListener`
 
 ## License
 

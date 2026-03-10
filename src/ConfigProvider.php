@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel;
+namespace BusinessG\HyperfExcel;
 
 use BusinessG\BaseExcel\AbstractExcel;
 use BusinessG\BaseExcel\Console\ExportCommandHandler;
@@ -37,14 +37,14 @@ use BusinessG\BaseExcel\Strategy\Path\ExportPathStrategyInterface;
 use BusinessG\BaseExcel\Strategy\Token\TokenStrategyInterface;
 use BusinessG\BaseExcel\Strategy\Token\UuidStrategy;
 use Psr\Container\ContainerInterface;
-use Vartruexuan\HyperfExcel\Command\ExportCommand;
-use Vartruexuan\HyperfExcel\Command\ImportCommand;
-use Vartruexuan\HyperfExcel\Command\MessageCommand;
-use Vartruexuan\HyperfExcel\Command\ProgressCommand;
-use Vartruexuan\HyperfExcel\Listener\HyperfExcelLogDbListener;
-use Vartruexuan\HyperfExcel\Listener\HyperfProgressListener;
-use Vartruexuan\HyperfExcel\Process\CleanFileProcess;
-use Vartruexuan\HyperfExcel\Queue\AsyncQueue\ExcelQueue;
+use BusinessG\HyperfExcel\Command\ExportCommand;
+use BusinessG\HyperfExcel\Command\ImportCommand;
+use BusinessG\HyperfExcel\Command\MessageCommand;
+use BusinessG\HyperfExcel\Command\ProgressCommand;
+use BusinessG\HyperfExcel\Listener\HyperfExcelLogDbListener;
+use BusinessG\HyperfExcel\Listener\HyperfProgressListener;
+use BusinessG\HyperfExcel\Process\CleanFileProcess;
+use BusinessG\HyperfExcel\Queue\AsyncQueue\ExcelQueue;
 
 class ConfigProvider
 {

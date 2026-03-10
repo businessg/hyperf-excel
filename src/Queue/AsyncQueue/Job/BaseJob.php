@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel\Queue\AsyncQueue\Job;
+namespace BusinessG\HyperfExcel\Queue\AsyncQueue\Job;
 
 use BusinessG\BaseExcel\Data\BaseConfig;
 use BusinessG\BaseExcel\Queue\ExcelJobTrait;

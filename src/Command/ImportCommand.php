@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Vartruexuan\HyperfExcel\Command;
+namespace BusinessG\HyperfExcel\Command;
 
 use BusinessG\BaseExcel\Console\ImportCommandHandler;
 use Hyperf\Command\Command as HyperfCommand;
