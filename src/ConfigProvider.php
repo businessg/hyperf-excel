@@ -35,6 +35,7 @@ use BusinessG\BaseExcel\Progress\ProgressInterface;
 use BusinessG\BaseExcel\Progress\ProgressStorageInterface;
 use BusinessG\BaseExcel\Progress\Storage\BridgeProgressStorage;
 use BusinessG\BaseExcel\Queue\ExcelQueueInterface;
+use BusinessG\BaseExcel\Service\ExcelBusinessService;
 use BusinessG\BaseExcel\Strategy\Path\DateTimeExportPathStrategy;
 use BusinessG\BaseExcel\Strategy\Path\ExportPathStrategyInterface;
 use BusinessG\BaseExcel\Strategy\Token\TokenStrategyInterface;
@@ -46,6 +47,7 @@ use BusinessG\HyperfExcel\Command\MessageCommand;
 use BusinessG\HyperfExcel\Command\ProgressCommand;
 use BusinessG\HyperfExcel\Listener\HyperfExcelLogDbListener;
 use BusinessG\HyperfExcel\Listener\HyperfProgressListener;
+use BusinessG\HyperfExcel\Listener\RegisterRouteListener;
 use BusinessG\HyperfExcel\Process\CleanFileProcess;
 use BusinessG\HyperfExcel\Queue\AsyncQueue\ExcelQueue;
 
@@ -81,6 +83,7 @@ class ConfigProvider
                 ExcelLogRepositoryInterface::class => HyperfExcelLogRepository::class,
                 ExcelLogInterface::class => ExcelLogManager::class,
                 ExcelInterface::class => AbstractExcel::class,
+                ExcelBusinessService::class => ExcelBusinessService::class,
                 ExcelLoggerInterface::class => ExcelLogger::class,
                 ExcelQueueInterface::class => ExcelQueue::class,
                 ExportPathStrategyInterface::class => DateTimeExportPathStrategy::class,
@@ -91,6 +94,13 @@ class ConfigProvider
                 ProgressCommandHandler::class => ProgressCommandHandler::class,
                 MessageCommandHandler::class => MessageCommandHandler::class,
             ],
+            'exceptions' => [
+                'handler' => [
+                    'http' => [
+                        \BusinessG\HyperfExcel\Exception\Handler\ExcelExceptionHandler::class,
+                    ],
+                ],
+            ],
             'commands' => [
                 ExportCommand::class,
                 ImportCommand::class,
@@ -100,6 +110,7 @@ class ConfigProvider
             'listeners' => [
                 HyperfProgressListener::class,
                 HyperfExcelLogDbListener::class,
+                RegisterRouteListener::class,
             ],
             'processes' => [
                 CleanFileProcess::class,
@@ -110,6 +121,12 @@ class ConfigProvider
                     'description' => 'The config for excel.',
                     'source' => __DIR__ . '/../publish/excel.php',
                     'destination' => BASE_PATH . '/config/autoload/excel.php',
+                ],
+                [
+                    'id' => 'excel-business-config',
+                    'description' => 'The business config for excel.',
+                    'source' => __DIR__ . '/../publish/excel_business.php',
+                    'destination' => BASE_PATH . '/config/autoload/excel_business.php',
                 ],
             ],
         ];

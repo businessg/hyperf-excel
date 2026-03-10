@@ -114,4 +114,44 @@ return [
         'maxAge' => 1800,
         'interval' => 3600,
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP 配置（路由注册 + 响应格式 + 项目域名）
+    |--------------------------------------------------------------------------
+    |
+    | 路由注册:
+    |  - enabled:      是否自动注册 Excel HTTP 接口，开启后无需手写 Controller 和路由
+    |                   最终路径为 {prefix}/excel/export, {prefix}/excel/import 等，/excel/* 部分固定
+    |  - prefix:       路由前缀，如 '/api' 则接口为 /api/excel/export
+    |  - middleware:    应用到整个路由组的中间件，支持字符串别名和完整类名
+    |                   如 [\App\Middleware\AuthMiddleware::class]
+    |
+    | 项目域名:
+    |  - domain:       项目域名（含协议），用于 info 接口拼接 templateUrl 完整地址
+    |                   当 excel_business.php 中 templateUrl 为相对路径（如 /excel/export?...）时
+    |                   info 接口会自动拼接此域名返回完整 URL
+    |                   如果 templateUrl 已是完整地址（http/https 开头），则不拼接
+    |
+    | 响应格式:
+    |  - codeField:    响应 JSON 中状态码的字段名，默认 'code'
+    |  - dataField:    响应 JSON 中数据的字段名，默认 'data'
+    |  - messageField: 响应 JSON 中消息的字段名，默认 'message'
+    |  - successCode:  成功时状态码的值，默认 0
+    |
+    |  示例: 如果项目约定响应格式为 {"status": 200, "result": {...}, "msg": "ok"}
+    |        则配置 codeField => 'status', dataField => 'result',
+    |        messageField => 'msg', successCode => 200
+    |
+    */
+    'http' => [
+        'enabled' => false,
+        'prefix' => '',
+        'middleware' => [],
+        'domain' => \Hyperf\Support\env('APP_URL', 'http://localhost:9501'),
+        'codeField' => 'code',
+        'dataField' => 'data',
+        'messageField' => 'message',
+        'successCode' => 0,
+    ],
 ];
