@@ -23,17 +23,11 @@
             "HyperfTest\\": "tests"
         }
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../base-excel"
-        }
-    ],
     "require": {
         "php": ">=8.1",
         "ext-mbstring": "*",
         "ext-xlswriter": "*",
-        "businessg/base-excel": "*",
+        "businessg/base-excel": "~1.0.0",
         "hyperf/redis": "~3.1.0",
         "hyperf/async-queue": "~3.1.0",
         "hyperf/filesystem": "~3.1.0",
