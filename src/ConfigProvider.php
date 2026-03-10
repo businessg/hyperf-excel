@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BusinessG\HyperfExcel;
 
 use BusinessG\BaseExcel\AbstractExcel;
+use BusinessG\BaseExcel\Config\ExcelConfig;
 use BusinessG\BaseExcel\Console\ExportCommandHandler;
 use BusinessG\BaseExcel\Console\ImportCommandHandler;
 use BusinessG\BaseExcel\Console\MessageCommandHandler;
@@ -21,6 +22,8 @@ use BusinessG\BaseExcel\Contract\RedisResolverInterface;
 use BusinessG\BaseExcel\Contract\ResponseFactoryInterface;
 use BusinessG\BaseExcel\Db\ExcelLogInterface;
 use BusinessG\BaseExcel\Db\ExcelLogManager;
+use BusinessG\BaseExcel\Db\ExcelLogRepositoryInterface;
+use BusinessG\HyperfExcel\Db\HyperfExcelLogRepository;
 use BusinessG\BaseExcel\Driver\DriverFactory;
 use BusinessG\BaseExcel\Driver\DriverInterface;
 use BusinessG\BaseExcel\ExcelInterface;
@@ -65,14 +68,17 @@ class ConfigProvider
                 DriverInterface::class => static fn (ContainerInterface $c) => (new ExcelInvoker())($c),
                 ProgressStorageInterface::class => BridgeProgressStorage::class,
                 ProgressInterface::class => static function (ContainerInterface $c) {
-                    $bridge = $c->get(ConfigResolverInterface::class);
-                    $config = $bridge->get('excel.progress', [
-                        'enable' => true,
-                        'prefix' => 'HyperfExcel',
-                        'expire' => 3600,
+                    $configResolver = $c->get(ConfigResolverInterface::class);
+                    $excelConfig = ExcelConfig::fromArray($configResolver->get('excel', []));
+                    return new Progress($c->get(ProgressStorageInterface::class), [
+                        'enabled' => $excelConfig->progress->enabled,
+                        'prefix' => $excelConfig->progress->prefix,
+                        'ttl' => $excelConfig->progress->ttl,
+                        'expire' => $excelConfig->progress->ttl,
+                        'enable' => $excelConfig->progress->enabled,
                     ]);
-                    return new Progress($c->get(ProgressStorageInterface::class), $config);
                 },
+                ExcelLogRepositoryInterface::class => HyperfExcelLogRepository::class,
                 ExcelLogInterface::class => ExcelLogManager::class,
                 ExcelInterface::class => AbstractExcel::class,
                 ExcelLoggerInterface::class => ExcelLogger::class,

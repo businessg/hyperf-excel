@@ -4,6 +4,33 @@
 [![Latest Stable Version](https://img.shields.io/packagist/v/businessg/hyperf-excel)](https://packagist.org/packages/businessg/hyperf-excel)
 [![License](https://img.shields.io/packagist/l/businessg/hyperf-excel)](https://github.com/businessg/hyperf-excel)
 
+> 本包延续自 [vartruexuan/hyperf-excel](https://github.com/vartruexuan/hyperf-excel) 仓库。
+
+## 从 vartruexuan/hyperf-excel 迁移
+
+从 `vartruexuan/hyperf-excel` 迁移到本包时，需做以下步骤：
+
+### 1. 移除旧包并安装新包
+
+```bash
+composer remove vartruexuan/hyperf-excel
+composer require businessg/hyperf-excel
+```
+
+### 2. 删除旧配置并重新发布
+
+```bash
+# 删除旧包发布的配置文件
+rm config/autoload/excel.php
+
+# 重新发布本包配置
+php bin/hyperf.php vendor:publish businessg/hyperf-excel
+```
+
+### 3. 代码调整
+
+请参考下方具体使用说明进行代码调整。
+
 ## 📌 概述
 
 Excel 同步/异步智能配置导入导出组件，为 Hyperf 框架提供强大的 Excel 处理能力。

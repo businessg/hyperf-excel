@@ -1,5 +1,5 @@
 CREATE TABLE `excel_log` (
-     `id` int unsigned NOT NULL AUTO_INCREMENT,
+     `id` bigint unsigned NOT NULL AUTO_INCREMENT,
      `token` varchar(64) NOT NULL DEFAULT '',
      `type` enum('export','import') NOT NULL DEFAULT 'export' COMMENT '类型:export导出import导入',
      `config_class` varchar(250) NOT NULL DEFAULT '',

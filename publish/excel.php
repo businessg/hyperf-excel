@@ -4,47 +4,40 @@ declare(strict_types=1);
 
 return [
     'default' => 'xlswriter',
+
     'drivers' => [
         'xlswriter' => [
-            'driver' => \BusinessG\BaseExcel\Driver\XlsWriterDriver::class,
-        ]
-    ],
-    'options' => [
-        // filesystem 配置
-        'filesystem' => [
-            'storage' => 'local', // 默认本地
-        ],
-        // 导出配置
-        'export' => [
-            'rootDir' => 'export', // 导出根目录
+            'class' => \BusinessG\BaseExcel\Driver\XlsWriterDriver::class,
+            'disk' => 'local',
+            'exportDir' => 'export',
+            'tempDir' => null,
         ],
     ],
-    // 日志
-    'logger' => [
-        'name' => 'hyperf-excel',
+
+    'logging' => [
+        'channel' => 'hyperf-excel',
     ],
-    // queue配置
+
     'queue' => [
-        'name' => 'default',
+        'connection' => 'default',
+        'channel' => 'default',
     ],
-    // 进度处理（使用 base Progress + HyperfProgressStorage）
+
     'progress' => [
-        'enable' => true,
+        'enabled' => true,
         'prefix' => 'HyperfExcel',
-        'expire' => 3600, // 数据失效时间
-        'redis' => [
-            'pool' => 'default',
-        ],
+        'ttl' => 3600,
+        'connection' => 'default',
     ],
-    // db日志
+
     'dbLog' => [
-        'enable' => true,
+        'enabled' => true,
         'model' => \BusinessG\HyperfExcel\Db\Model\ExcelLog::class,
     ],
-    // 清除临时文件
-    'cleanTempFile' => [
-        'enable' => true, // 是否允许
-        'time' => 1800, // 文件未操作时间(秒)
-        'interval' => 3600,// 间隔检查时间
+
+    'cleanup' => [
+        'enabled' => true,
+        'maxAge' => 1800,
+        'interval' => 3600,
     ],
 ];
