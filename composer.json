@@ -23,6 +23,12 @@
             "HyperfTest\\": "tests"
         }
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/businessg/base-excel.git"
+        }
+    ],
     "require": {
         "php": ">=8.1",
         "ext-mbstring": "*",
