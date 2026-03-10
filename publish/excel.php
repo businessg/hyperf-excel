@@ -6,7 +6,7 @@ return [
     'default' => 'xlswriter',
     'drivers' => [
         'xlswriter' => [
-            'driver' => \Vartruexuan\HyperfExcel\Driver\XlsWriterDriver::class,
+            'driver' => \BusinessG\BaseExcel\Driver\XlsWriterDriver::class,
         ]
     ],
     'options' => [
