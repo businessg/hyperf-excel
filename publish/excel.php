@@ -133,15 +133,19 @@ return [
     |                   info 接口会自动拼接此域名返回完整 URL
     |                   如果 templateUrl 已是完整地址（http/https 开头），则不拼接
     |
-    | 响应格式:
+    | 响应格式（response 下）:
     |  - codeField:    响应 JSON 中状态码的字段名，默认 'code'
     |  - dataField:    响应 JSON 中数据的字段名，默认 'data'
     |  - messageField: 响应 JSON 中消息的字段名，默认 'message'
     |  - successCode:  成功时状态码的值，默认 0
     |
+    | 上传配置（upload 接口保存路径）:
+    |  - upload.disk: 文件系统磁盘名，对应 config/autoload/file.php 中 storage 的 key
+    |  - upload.dir:  相对路径，导入文件存放目录（相对于 disk 根路径）
+    |
     |  示例: 如果项目约定响应格式为 {"status": 200, "result": {...}, "msg": "ok"}
-    |        则配置 codeField => 'status', dataField => 'result',
-    |        messageField => 'msg', successCode => 200
+    |        则配置 response.codeField => 'status', response.dataField => 'result',
+    |        response.messageField => 'msg', response.successCode => 200
     |
     */
     'http' => [
@@ -149,9 +153,15 @@ return [
         'prefix' => '',
         'middleware' => [],
         'domain' => \Hyperf\Support\env('APP_URL', 'http://localhost:9501'),
-        'codeField' => 'code',
-        'dataField' => 'data',
-        'messageField' => 'message',
-        'successCode' => 0,
+        'response' => [
+            'codeField' => 'code',
+            'dataField' => 'data',
+            'messageField' => 'message',
+            'successCode' => 0,
+        ],
+        'upload' => [
+            'disk' => 'local',
+            'dir' => 'excel-import',
+        ],
     ],
 ];

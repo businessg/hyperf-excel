@@ -1,6 +1,12 @@
 {
     "name": "businessg/hyperf-excel",
     "type": "library",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../base-excel"
+        }
+    ],
     "license": "MIT",
     "keywords": [
         "php",
@@ -27,7 +33,7 @@
         "php": ">=8.1",
         "ext-mbstring": "*",
         "ext-xlswriter": "*",
-        "businessg/base-excel": "~1.0.0",
+        "businessg/base-excel": "*",
         "hyperf/redis": "~3.1.0",
         "hyperf/async-queue": "~3.1.0",
         "hyperf/filesystem": "~3.1.0",
