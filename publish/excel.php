@@ -133,6 +133,11 @@ return [
     |                   info 接口会自动拼接此域名返回完整 URL
     |                   如果 templateUrl 已是完整地址（http/https 开头），则不拼接
     |
+    | 接口字段命名风格:
+    |  - fieldNaming:  接口返回 JSON 的字段命名风格
+    |                   'camel'（默认）— 驼峰，如 sheetListProgress、isEnd、templateUrl
+    |                   'snake' — 下划线，如 sheet_list_progress、is_end、template_url
+    |
     | 响应格式（response 下）:
     |  - codeField:    响应 JSON 中状态码的字段名，默认 'code'
     |  - dataField:    响应 JSON 中数据的字段名，默认 'data'
@@ -153,6 +158,7 @@ return [
         'prefix' => '',
         'middleware' => [],
         'domain' => \Hyperf\Support\env('APP_URL', 'http://localhost:9501'),
+        'fieldNaming' => 'camel',
         'response' => [
             'codeField' => 'code',
             'dataField' => 'data',
