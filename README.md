@@ -1,17 +1,17 @@
 # businessg/hyperf-excel
 
-Hyperf 框架的 Excel 同步/异步导入导出组件。基于 [businessg/base-excel](https://github.com/businessg/base-excel) 核心库，提供开箱即用的 HTTP 接口自动注册、CLI 命令、进度追踪、消息推送、数据库日志。
+Hyperf 框架的 Excel 同步/异步导入导出组件，提供开箱即用的 HTTP 接口自动注册、CLI 命令、进度追踪、消息推送、数据库日志。
+
+> Laravel 版本请查看 [businessg/laravel-excel](https://github.com/businessg/laravel-excel)
 
 ---
 
 ## 目录
 
-- [1. 环境要求与安装](#1-环境要求与安装)
+- [1. 快速开始](#1-快速开始)
 - [2. 配置参考](#2-配置参考)
   - [2.1 excel.php — 组件核心配置](#21-excelphp--组件核心配置)
   - [2.2 excel_business.php — 业务配置](#22-excel_businessphp--业务配置)
-    - [导出配置项说明](#导出配置项说明)
-    - [导入配置项说明](#导入配置项说明)
 - [3. API 接口参考](#3-api-接口参考)
 - [4. 实现一个「导出」完整流程](#4-实现一个导出完整流程)
 - [5. 实现一个「导入」完整流程](#5-实现一个导入完整流程)
@@ -25,13 +25,13 @@ Hyperf 框架的 Excel 同步/异步导入导出组件。基于 [businessg/base-
   - [7.6 ImportConfig — 导入配置类](#76-importconfig--导入配置类)
   - [7.7 导入 Sheet](#77-导入-sheet)
   - [7.8 导入 Column](#78-导入-column)
-- [8. 流程图](#8-流程图)
-- [9. 内置 Demo 配置](#9-内置-demo-配置)
-- [10. Hyperf 特别注意事项](#10-hyperf-特别注意事项)
+- [8. 内置 Demo 配置](#8-内置-demo-配置)
+- [9. 依赖组件与配置](#9-依赖组件与配置)
+- [10. Hyperf 注意事项](#10-hyperf-注意事项)
 
 ---
 
-## 1. 环境要求与安装
+## 1. 快速开始
 
 ### 1.1 环境要求
 
@@ -40,38 +40,22 @@ Hyperf 框架的 Excel 同步/异步导入导出组件。基于 [businessg/base-
 | PHP | >= 8.1 | |
 | Hyperf | 3.x | |
 | Swoole | >= 5.0 | Hyperf 运行时 |
-| Redis 服务 | 任意版本 | 需运行中，用于进度存储和消息队列 |
-| MySQL | 5.7+ | 仅 `dbLog.enabled=true` 时需要 |
+| Redis | 任意 | 进度存储和消息队列 |
+| MySQL | 5.7+ | 仅 `dbLog.enabled = true` 时需要 |
 
 ### 1.2 PHP 扩展
 
-以下 PHP 扩展必须安装并启用：
-
-```bash
-# xlswriter — Excel 读写核心驱动
-pecl install xlswriter
-# 安装后在 php.ini 中添加：extension=xlswriter
-
-# redis — 进度追踪和消息队列依赖
-pecl install redis
-# 安装后在 php.ini 中添加：extension=redis
-
-# mbstring — 字符串处理（通常已内置）
-# 如未启用：apt install php-mbstring 或 yum install php-mbstring
-
-# swoole — Hyperf 运行时（通常已安装）
-pecl install swoole
-```
+| 扩展 | 用途 | 安装方式 |
+|---|---|---|
+| xlswriter | Excel 读写核心驱动 | `pecl install xlswriter` |
+| redis | 进度追踪和消息队列 | `pecl install redis` |
+| mbstring | 字符串处理（通常已内置） | `apt install php-mbstring` |
+| swoole | Hyperf 运行时 | `pecl install swoole` |
 
 验证扩展已安装：
 
 ```bash
 php -m | grep -E "xlswriter|redis|mbstring|swoole"
-# 应输出：
-# mbstring
-# redis
-# swoole
-# xlswriter
 ```
 
 ### 1.3 安装
@@ -82,135 +66,7 @@ composer require businessg/hyperf-excel
 
 > 组件自带 `ConfigProvider`，Hyperf 安装后自动合并配置，无需手动注册。
 
-### 1.4 依赖组件说明
-
-以下 Composer 包由组件自动引入，无需手动安装。但部分包需要**确认已配置**：
-
-| 依赖包 | 用途 | 需要的配置 |
-|---|---|---|
-| `businessg/base-excel` | 核心库（自动安装） | 无 |
-| `hyperf/filesystem` | 导出文件存储 | 需配置 `config/autoload/file.php`，详见下方 |
-| `hyperf/redis` | 进度追踪、消息队列 | 需配置 `config/autoload/redis.php` |
-| `hyperf/async-queue` | 异步导入导出 | 需配置 `config/autoload/async_queue.php` |
-| `hyperf/logger` | 组件日志输出 | 需配置 `config/autoload/logger.php` |
-| `hyperf/event` | 路由注册（BootApplication 事件） | 无需额外配置 |
-| `hyperf/command` | CLI 命令（excel:export / excel:import） | 无 |
-| `hyperf/support` | 工具函数（`\Hyperf\Support\env()` 等） | 无 |
-| `league/flysystem` | 文件系统抽象层（base-excel 依赖） | 无需额外配置 |
-| `ramsey/uuid` | 生成任务 token | 无 |
-
-**重点检查项：**
-
-**1) Filesystem（文件系统）— 必须配置**
-
-`hyperf/filesystem` 需要配置文件存储。如果项目中尚未配置，需创建 `config/autoload/file.php`：
-
-```php
-<?php
-
-declare(strict_types=1);
-
-use Hyperf\Filesystem\Adapter\LocalAdapterFactory;
-
-return [
-    'default' => 'local',
-    'storage' => [
-        'local' => [
-            'driver' => LocalAdapterFactory::class,
-            'root'   => BASE_PATH . '/runtime',
-        ],
-    ],
-];
-```
-
-> 如需存储到 OSS/S3 等云存储，安装对应 Flysystem 适配器包：
-> - 阿里云 OSS：`composer require hyperf/flysystem-oss`
-> - AWS S3：`composer require league/flysystem-aws-s3-v3`
->
-> 然后在 `file.php` 中添加对应 storage 配置。
-
-**2) Redis — 必须配置**
-
-确认 `config/autoload/redis.php` 存在并配置正确：
-
-```php
-<?php
-
-declare(strict_types=1);
-
-return [
-    'default' => [
-        'host'     => \Hyperf\Support\env('REDIS_HOST', '127.0.0.1'),
-        'auth'     => \Hyperf\Support\env('REDIS_AUTH', null),
-        'port'     => (int) \Hyperf\Support\env('REDIS_PORT', 6379),
-        'db'       => (int) \Hyperf\Support\env('REDIS_DB', 0),
-        'pool'     => [
-            'min_connections' => 1,
-            'max_connections' => 10,
-            'connect_timeout' => 10.0,
-            'wait_timeout'    => 3.0,
-        ],
-    ],
-];
-```
-
-**3) AsyncQueue（异步模式需要）**
-
-使用异步导入导出时，确认 `config/autoload/async_queue.php` 存在：
-
-```php
-<?php
-
-declare(strict_types=1);
-
-return [
-    'default' => [
-        'driver'         => \Hyperf\AsyncQueue\Driver\RedisDriver::class,
-        'redis'          => ['pool' => 'default'],
-        'channel'        => '{queue}',
-        'timeout'        => 2,
-        'retry_seconds'  => 5,
-        'handle_timeout' => 600,
-        'processes'      => 1,
-        'concurrent'     => ['limit' => 5],
-    ],
-];
-```
-
-**4) Logger（日志通道）**
-
-确认 `config/autoload/logger.php` 中有对应通道：
-
-```php
-<?php
-
-declare(strict_types=1);
-
-use Monolog\Handler\StreamHandler;
-use Monolog\Formatter\LineFormatter;
-
-return [
-    'default' => [
-        'handler' => [
-            'class'       => StreamHandler::class,
-            'constructor' => [
-                'stream' => BASE_PATH . '/runtime/logs/hyperf.log',
-                'level'  => Monolog\Level::Debug,
-            ],
-        ],
-        'formatter' => [
-            'class'       => LineFormatter::class,
-            'constructor' => [
-                'format'                => null,
-                'dateFormat'            => 'Y-m-d H:i:s',
-                'allowInlineLineBreaks' => true,
-            ],
-        ],
-    ],
-];
-```
-
-### 1.5 发布配置文件
+### 1.4 发布配置文件
 
 ```bash
 php bin/hyperf.php vendor:publish businessg/hyperf-excel
@@ -221,7 +77,7 @@ php bin/hyperf.php vendor:publish businessg/hyperf-excel
 - `config/autoload/excel.php` — 组件核心配置
 - `config/autoload/excel_business.php` — 业务导入导出配置
 
-### 1.6 数据库迁移
+### 1.5 数据库迁移
 
 启用数据库日志（`dbLog.enabled = true`）时手动执行建表 SQL：
 
@@ -273,8 +129,7 @@ return [
     | drivers — 驱动配置
     |----------------------------------------------------------------------
     | class     : 驱动实现类
-    | disk      : 文件系统磁盘名，对应 Hyperf Filesystem 中的 storage
-    |             导出文件存储路径
+    | disk      : 文件系统磁盘名，对应 config/autoload/file.php 中 storage 的 key
     | exportDir : 导出文件存放子目录
     | tempDir   : 临时文件目录，null 使用 sys_get_temp_dir()
     */
@@ -305,9 +160,6 @@ return [
     |
     | connection : 队列连接名，对应 config/autoload/async_queue.php 的 key
     | channel    : 队列名称（Hyperf AsyncQueue 的 channel）
-    |
-    | ⚠️ Hyperf 使用 AsyncQueue（Redis 实现），而非 Laravel 的 Queue。
-    |    确保 async_queue.php 中有对应连接。
     */
     'queue' => [
         'connection' => 'default',
@@ -335,7 +187,7 @@ return [
     | dbLog — 数据库日志配置
     |----------------------------------------------------------------------
     | enabled : 是否启用数据库日志记录
-    | model   : Hyperf Model 类名（需使用 ModelIDE 注解或继承自 Model）
+    | model   : Hyperf Model 类名
     */
     'dbLog' => [
         'enabled' => true,
@@ -363,34 +215,45 @@ return [
     | http — HTTP 接口与响应配置
     |----------------------------------------------------------------------
     |
-    | ◆ 路由注册（enabled = true 时生效）:
-    |   自动在 BootApplication 事件中注册 {prefix}/excel/* 路由。
-    |   无需手写 Controller 和 routes.php 路由。
+    | 路由注册（enabled = true 时生效）:
+    |   自动在 BootApplication 事件中注册 {prefix}/excel/* 路由，
+    |   无需手写 Controller 和 routes.php。
     |
     | enabled    : 是否自动注册路由
-    | prefix     : 路由前缀。如 '' → /excel/export
-    |              如 'api' → /api/excel/export
+    | prefix     : 路由前缀，如 '' → /excel/export，如 'api' → /api/excel/export
     | middleware : 中间件类名数组
-    |
-    | ◆ 项目域名:
     | domain     : 项目域名（含协议），用于 info 接口拼接动态模板 URL
-    |              ⚠️ Hyperf 中使用 \Hyperf\Support\env() 读取环境变量
     |
-    | ◆ 响应 JSON 字段映射:
-    | codeField    : 状态码字段名，默认 'code'
-    | dataField    : 数据字段名，默认 'data'
-    | messageField : 消息字段名，默认 'message'
-    | successCode  : 成功时的状态码值，默认 0
+    | fieldNaming : 接口返回 JSON 的字段命名风格
+    |               'camel'（默认）— 驼峰，如 sheetListProgress、isEnd、templateUrl
+    |               'snake' — 下划线，如 sheet_list_progress、is_end、template_url
+    |
+    | response — 响应 JSON 字段映射:
+    |   codeField    : 状态码字段名，默认 'code'
+    |   dataField    : 数据字段名，默认 'data'
+    |   messageField : 消息字段名，默认 'message'
+    |   successCode  : 成功时的状态码值，默认 0
+    |
+    | upload — 文件上传配置:
+    |   disk : 文件系统磁盘名，对应 config/autoload/file.php 中 storage 的 key
+    |   dir  : 导入文件存放目录（相对于 disk 根路径）
     */
     'http' => [
-        'enabled'      => false,
-        'prefix'       => '',
-        'middleware'    => [],
-        'domain'       => \Hyperf\Support\env('APP_URL', 'http://localhost:9501'),
-        'codeField'    => 'code',
-        'dataField'    => 'data',
-        'messageField' => 'message',
-        'successCode'  => 0,
+        'enabled'    => false,
+        'prefix'     => '',
+        'middleware'  => [],
+        'domain'     => \Hyperf\Support\env('APP_URL', 'http://localhost:9501'),
+        'fieldNaming' => 'camel',
+        'response'   => [
+            'codeField'    => 'code',
+            'dataField'    => 'data',
+            'messageField' => 'message',
+            'successCode'  => 0,
+        ],
+        'upload' => [
+            'disk' => 'local',
+            'dir'  => 'excel-import',
+        ],
     ],
 ];
 ```
@@ -424,21 +287,15 @@ return [
     | key（如 'orderImport'）即为 business_id。
     |
     | config : ImportConfig 子类的完整类名（必填）
-    |          该类定义了导入的列映射、表头行号、行回调处理逻辑等。
+    | info   : 可选，附加信息。前端通过 GET /excel/info?business_id=xxx 获取。
     |
-    | info   : 可选，附加信息对象。前端通过 GET /excel/info?business_id=xxx 获取。
-    |          常用于传递导入模板下载地址。
-    |
-    |   ◆ info.templateBusinessId — 动态模板（推荐）
+    |   info.templateBusinessId — 动态模板（推荐）
     |     值为一个导出 business_id。info 接口会自动拼接为完整 URL:
     |       {http.domain}/{http.prefix}/excel/export?business_id={templateBusinessId}
-    |     ⚠️ 对应的导出配置必须满足:
-    |       - isAsync = false     （同步执行，不走队列）
-    |       - outPutType = 'out'  （直接输出文件流，浏览器访问即下载）
+    |     对应的导出配置必须满足: isAsync=false + outPutType='out'
     |
-    |   ◆ info.templateUrl — 静态模板
+    |   info.templateUrl — 静态模板
     |     值为完整的 URL 地址，info 接口直接返回。
-    |     如: 'https://cdn.example.com/templates/order.xlsx'
     |
     |   两者二选一。如同时配置，templateUrl 优先。
     */
@@ -501,7 +358,7 @@ return [
 | 参数 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `business_id` | string | 是 | excel_business.php 中注册的导入 key |
-| `url` | string | 是 | Excel 文件的本地绝对路径（由 upload 接口返回） |
+| `url` | string | 是 | Excel 文件路径（由 upload 接口返回） |
 
 **响应：**
 
@@ -563,12 +420,13 @@ return [
     "code": 0,
     "data": {
         "isEnd": false,
-        "message": ["第2行: 张三 <zhangsan@example.com> 导入成功", "..."]
+        "message": ["第2行: 张三 导入成功", "..."]
     }
 }
 ```
 
 > 消息为**消费式**，取后即删。`isEnd = true` 时表示全部消息已输出完毕。
+> 当 `fieldNaming = 'snake'` 时，字段名为 `is_end`。
 
 ### 3.5 导入信息 — `{prefix}/excel/info`
 
@@ -589,6 +447,8 @@ return [
 }
 ```
 
+> 当 `fieldNaming = 'snake'` 时，字段名为 `template_url`。
+
 ### 3.6 文件上传 — `{prefix}/excel/upload`
 
 | 项目 | 说明 |
@@ -596,7 +456,7 @@ return [
 | 方法 | `POST` |
 | Content-Type | `multipart/form-data` |
 
-**请求参数：** `file`（必填，.xlsx/.xls，最大 10MB）
+**请求参数：** `file`（必填，.xlsx/.xls）
 
 **响应：**
 
@@ -649,39 +509,17 @@ use BusinessG\BaseExcel\Data\Export\Sheet;
 
 class OrderExportConfig extends ExportConfig
 {
-    /**
-     * 服务名称，用于日志标识和 UI 展示
-     */
     public string $serviceName = '订单导出';
-
-    /**
-     * 是否异步执行：
-     *   false — 同步，请求等待导出完成后返回结果
-     *   true  — 异步，立即返回 token，后台队列处理
-     */
     public bool $isAsync = false;
-
-    /**
-     * 输出方式：
-     *   OUT_PUT_TYPE_UPLOAD — 生成文件并保存，返回文件路径
-     *   OUT_PUT_TYPE_OUT    — 直接输出文件流，浏览器访问即下载
-     */
     public string $outPutType = self::OUT_PUT_TYPE_UPLOAD;
 
-    /**
-     * 定义 Sheet 结构
-     */
     public function getSheets(): array
     {
         $this->setSheets([
             new Sheet([
-                'name'     => '订单列表',       // Sheet 名称
-                'columns'  => [                 // 列定义
-                    new Column([
-                        'title' => '订单号',     // 列标题（Excel 表头）
-                        'field' => 'order_no',  // 数据字段名
-                        'width' => 20,          // 列宽（可选）
-                    ]),
+                'name'     => '订单列表',
+                'columns'  => [
+                    new Column(['title' => '订单号',   'field' => 'order_no', 'width' => 20]),
                     new Column(['title' => '客户名称', 'field' => 'customer_name']),
                     new Column(['title' => '金额',     'field' => 'amount']),
                     new Column(['title' => '状态',     'field' => 'status_text']),
@@ -700,12 +538,6 @@ class OrderExportConfig extends ExportConfig
         return Order::count();
     }
 
-    /**
-     * 分页获取数据回调
-     *
-     * @param ExportCallbackParam $param 包含 page 和 pageSize
-     * @return array 二维数组
-     */
     public function getData(ExportCallbackParam $param): array
     {
         return Order::query()
@@ -779,18 +611,14 @@ use BusinessG\BaseExcel\Data\Export\Style;
 class OrderImportTemplateConfig extends ExportConfig
 {
     public string $serviceName = '订单导入模板';
-
-    /** ⚠️ 必须同步 */
     public bool $isAsync = false;
-
-    /** ⚠️ 必须直接输出 */
     public string $outPutType = self::OUT_PUT_TYPE_OUT;
 
     public function getSheets(): array
     {
         $this->setSheets([
             new Sheet([
-                'name'    => 'sheet1',
+                'name' => 'sheet1',
                 'columns' => [
                     new Column([
                         'title' => implode("\n", [
@@ -852,7 +680,7 @@ class OrderImportConfig extends ImportConfig
         $this->setSheets([
             new Sheet([
                 'name'        => 'sheet1',
-                'headerIndex' => 2,   // 模板第 1 行是说明行，第 2 行是列标题
+                'headerIndex' => 2,
                 'columns'     => [
                     new Column(['title' => '订单号', 'field' => 'order_no']),
                     new Column(['title' => '金额',   'field' => 'amount']),
@@ -863,9 +691,6 @@ class OrderImportConfig extends ImportConfig
         return $this->sheets;
     }
 
-    /**
-     * 逐行回调：校验 + 写入数据库
-     */
     public function rowCallback(ImportRowCallbackParam $param): void
     {
         if (empty($param->row)) {
@@ -923,19 +748,16 @@ class OrderImportConfig extends ImportConfig
 ```bash
 # 1. 获取导入信息（含模板下载地址）
 curl "http://localhost:9501/excel/info?business_id=orderImport"
-# → {"code":0,"data":{"templateUrl":"http://localhost:9501/excel/export?business_id=orderImportTemplate"}}
 
 # 2. 下载模板（浏览器直接访问 templateUrl 即下载）
 
 # 3. 上传填写完的文件
 curl -X POST http://localhost:9501/excel/upload -F "file=@orders.xlsx"
-# → {"code":0,"data":{"path":"/full/path/to/file.xlsx"}}
 
 # 4. 执行导入
 curl -X POST http://localhost:9501/excel/import \
   -H "Content-Type: application/json" \
   -d '{"business_id": "orderImport", "url": "/full/path/to/file.xlsx"}'
-# → {"code":0,"data":{"token":"uuid-xxx"}}
 
 # 5. 轮询进度
 curl "http://localhost:9501/excel/progress?token=uuid-xxx"
@@ -966,17 +788,13 @@ declare(strict_types=1);
 return [
     'default' => [
         'driver'         => \Hyperf\AsyncQueue\Driver\RedisDriver::class,
-        'redis'          => [
-            'pool' => 'default',
-        ],
+        'redis'          => ['pool' => 'default'],
         'channel'        => '{queue}',
         'timeout'        => 2,
         'retry_seconds'  => 5,
-        'handle_timeout' => 600,  // 导出大文件可适当增大
+        'handle_timeout' => 600,
         'processes'      => 1,
-        'concurrent'     => [
-            'limit' => 5,
-        ],
+        'concurrent'     => ['limit' => 5],
     ],
 ];
 ```
@@ -987,7 +805,7 @@ return [
 
 ```php
 'queue' => [
-    'connection' => 'default',   // 对应 async_queue.php 的 key
+    'connection' => 'default',
     'channel'    => 'default',
 ],
 ```
@@ -1008,8 +826,6 @@ class OrderAsyncExportConfig extends ExportConfig
 ### 6.4 AsyncQueue 自动启动
 
 Hyperf AsyncQueue 的 Worker 随主进程自动启动（`async_queue.php` 中 `processes >= 1`），**无需手动启动**。
-
-启动 Hyperf 服务即可：
 
 ```bash
 php bin/hyperf.php start
@@ -1079,9 +895,9 @@ public function getSheets(): array
 | `$columns` | `Column[]` | `[]` | 列定义数组，决定表头和数据映射 |
 | `$count` | `int` | `0` | 数据总行数，用于进度百分比计算。设为 0 则进度条无法显示百分比 |
 | `$pageSize` | `int` | `2000` | 分页大小。引擎每次调用 `data` 回调获取 pageSize 条数据 |
-| `$data` | `Closure\|array` | `[]` | 数据来源回调。引擎按分页自动调用，签名：`function(ExportCallbackParam $param): array`。也可传二维数组（静态数据） |
+| `$data` | `Closure\|array` | `[]` | 数据来源回调。签名：`function(ExportCallbackParam $param): array`。也可传二维数组 |
 | `$style` | `?SheetStyle` | `null` | Sheet 级样式配置（网格线、缩放等），详见 7.5 |
-| `$options` | `array` | `[]` | 扩展选项，预留 |
+| `$options` | `array` | `[]` | 扩展选项 |
 
 **data 回调参数 `ExportCallbackParam`：**
 
@@ -1104,34 +920,27 @@ public function getSheets(): array
 | `$field` | `string` | `''` | 数据字段名，对应 `getData()` 返回数组中的 key |
 | `$width` | `int` | `0` | 列宽（字符数）。0 使用 Excel 默认宽度 |
 | `$height` | `int` | `0` | 行高（像素）。通常在含说明行的首列上设置 |
-| `$type` | `string` | `''` | 数据类型（预留，当前版本未强制转换） |
-| `$callback` | `mixed` | `null` | 单元格值格式化回调。签名：`function($value, $row): mixed`。如需对某列数据做格式转换可使用 |
+| `$type` | `string` | `''` | 数据类型（预留） |
+| `$callback` | `mixed` | `null` | 单元格值格式化回调。签名：`function($value, $row): mixed` |
 | `$style` | `?Style` | `null` | **数据单元格**的样式（应用于该列每一行数据） |
 | `$headerStyle` | `?Style` | `null` | **表头单元格**的样式（仅应用于该列标题行） |
-| `$children` | `Column[]` | `[]` | 子列定义，用于**多行表头**（如第一行是说明行，第二行是实际列标题） |
-| `$hasChildren` | `bool` | `false` | 是否有子列（设置 children 后自动为 true） |
-| `$col` | `int` | `0` | 列索引（引擎自动计算，通常无需手动设置） |
-| `$row` | `int` | `0` | 行索引（引擎自动计算） |
-| `$colSpan` | `int` | `0` | 合并列数（引擎根据 children 自动计算） |
-| `$rowSpan` | `int` | `0` | 合并行数（引擎自动计算） |
-| `$key` | `string` | `''` | 唯一标识（预留） |
-| `$options` | `array` | `[]` | 扩展选项 |
+| `$children` | `Column[]` | `[]` | 子列定义，用于**多行表头** |
 
 **多行表头示例（说明行 + 列标题行）：**
 
 ```php
 new Column([
-    'title'       => "1、姓名：必填\n2、邮箱：必填",  // 第一行：说明文本
+    'title'       => "1、姓名：必填\n2、邮箱：必填",
     'field'       => 'name',
     'height'      => 58,
     'headerStyle' => new Style([
-        'wrap'      => true,           // 自动换行
-        'fontColor' => 0x2972F4,       // 蓝色字体
+        'wrap'      => true,
+        'fontColor' => 0x2972F4,
         'fontSize'  => 10,
         'bold'      => true,
         'align'     => [Style::FORMAT_ALIGN_LEFT, Style::FORMAT_ALIGN_VERTICAL_CENTER],
     ]),
-    'children' => [                    // 第二行：实际列标题
+    'children' => [
         new Column(['title' => '姓名', 'field' => 'name',  'width' => 20]),
         new Column(['title' => '邮箱', 'field' => 'email', 'width' => 30]),
     ],
@@ -1147,72 +956,40 @@ new Column([
 | `$bold` | `bool` | `false` | 粗体 |
 | `$italic` | `bool` | `false` | 斜体 |
 | `$strikeout` | `bool` | `false` | 删除线 |
-| `$underline` | `int` | `0` | 下划线样式。0 = 无，可选常量见下方 |
-| `$wrap` | `bool` | `false` | 自动换行。标题含 `\n` 时需设为 `true` |
-| `$font` | `string` | `''` | 字体名称。如 `'微软雅黑'`、`'Arial'` |
-| `$fontSize` | `float` | `0` | 字号。0 使用 Excel 默认（11） |
-| `$fontColor` | `int` | `0` | 字体颜色。十六进制 RGB，如 `0xFF0000`（红色）、`0x2972F4`（蓝色） |
-| `$backgroundColor` | `int` | `0` | 背景颜色。格式同 fontColor |
-| `$backgroundStyle` | `int` | `0` | 背景填充样式。0 = 无，常用 `PATTERN_SOLID`（纯色填充） |
-| `$border` | `int` | `0` | 边框样式。0 = 无边框 |
-| `$align` | `array` | `[]` | 对齐方式数组。可同时传水平+垂直，如 `[Style::FORMAT_ALIGN_CENTER, Style::FORMAT_ALIGN_VERTICAL_CENTER]` |
+| `$underline` | `int` | `0` | 下划线样式 |
+| `$wrap` | `bool` | `false` | 自动换行 |
+| `$font` | `string` | `''` | 字体名称 |
+| `$fontSize` | `float` | `0` | 字号，0 使用 Excel 默认（11） |
+| `$fontColor` | `int` | `0` | 字体颜色，十六进制 RGB |
+| `$backgroundColor` | `int` | `0` | 背景颜色 |
+| `$backgroundStyle` | `int` | `0` | 背景填充样式 |
+| `$border` | `int` | `0` | 边框样式 |
+| `$align` | `array` | `[]` | 对齐方式数组 |
 
-**下划线常量：**
+**常用常量：**
 
-| 常量 | 值 | 说明 |
-|---|---|---|
-| `Style::UNDERLINE_SINGLE` | `1` | 单下划线 |
-| `Style::UNDERLINE_DOUBLE` | `2` | 双下划线 |
-| `Style::UNDERLINE_SINGLE_ACCOUNTING` | `3` | 会计用单下划线 |
-| `Style::UNDERLINE_DOUBLE_ACCOUNTING` | `4` | 会计用双下划线 |
-
-**边框常量：**
-
-| 常量 | 值 | 说明 |
-|---|---|---|
-| `Style::BORDER_THIN` | `1` | 细线 |
-| `Style::BORDER_MEDIUM` | `2` | 中等 |
-| `Style::BORDER_DASHED` | `3` | 虚线 |
-| `Style::BORDER_DOTTED` | `4` | 点线 |
-| `Style::BORDER_THICK` | `5` | 粗线 |
-| `Style::BORDER_DOUBLE` | `6` | 双线 |
-| `Style::BORDER_HAIR` | `7` | 极细线 |
-
-**对齐常量（水平）：**
-
-| 常量 | 值 | 说明 |
-|---|---|---|
-| `Style::FORMAT_ALIGN_LEFT` | `1` | 左对齐 |
-| `Style::FORMAT_ALIGN_CENTER` | `2` | 居中 |
-| `Style::FORMAT_ALIGN_RIGHT` | `3` | 右对齐 |
-| `Style::FORMAT_ALIGN_FILL` | `4` | 填充 |
-| `Style::FORMAT_ALIGN_JUSTIFY` | `5` | 两端对齐 |
-
-**对齐常量（垂直）：**
-
-| 常量 | 值 | 说明 |
-|---|---|---|
-| `Style::FORMAT_ALIGN_VERTICAL_TOP` | `8` | 顶端对齐 |
-| `Style::FORMAT_ALIGN_VERTICAL_CENTER` | `10` | 垂直居中 |
-| `Style::FORMAT_ALIGN_VERTICAL_BOTTOM` | `9` | 底端对齐 |
-| `Style::FORMAT_ALIGN_VERTICAL_JUSTIFY` | `11` | 垂直两端对齐 |
-
-**背景填充常量（常用）：**
-
-| 常量 | 值 | 说明 |
-|---|---|---|
-| `Style::PATTERN_NONE` | `1` | 无填充 |
-| `Style::PATTERN_SOLID` | `2` | 纯色填充（最常用） |
-| `Style::PATTERN_MEDIUM_GRAY` | `3` | 中灰色 |
-| `Style::PATTERN_DARK_GRAY` | `4` | 深灰色 |
-| `Style::PATTERN_LIGHT_GRAY` | `5` | 浅灰色 |
+| 分类 | 常量 | 值 | 说明 |
+|---|---|---|---|
+| 下划线 | `UNDERLINE_SINGLE` | 1 | 单下划线 |
+| 下划线 | `UNDERLINE_DOUBLE` | 2 | 双下划线 |
+| 边框 | `BORDER_THIN` | 1 | 细线 |
+| 边框 | `BORDER_MEDIUM` | 2 | 中等 |
+| 边框 | `BORDER_DASHED` | 3 | 虚线 |
+| 边框 | `BORDER_THICK` | 5 | 粗线 |
+| 边框 | `BORDER_DOUBLE` | 6 | 双线 |
+| 水平对齐 | `FORMAT_ALIGN_LEFT` | 1 | 左对齐 |
+| 水平对齐 | `FORMAT_ALIGN_CENTER` | 2 | 居中 |
+| 水平对齐 | `FORMAT_ALIGN_RIGHT` | 3 | 右对齐 |
+| 垂直对齐 | `FORMAT_ALIGN_VERTICAL_TOP` | 8 | 顶端对齐 |
+| 垂直对齐 | `FORMAT_ALIGN_VERTICAL_CENTER` | 10 | 垂直居中 |
+| 垂直对齐 | `FORMAT_ALIGN_VERTICAL_BOTTOM` | 9 | 底端对齐 |
+| 背景 | `PATTERN_SOLID` | 2 | 纯色填充 |
 
 **样式综合示例：**
 
 ```php
 use BusinessG\BaseExcel\Data\Export\Style;
 
-// 表头样式：蓝色加粗居中 + 浅灰背景 + 细边框
 $headerStyle = new Style([
     'bold'            => true,
     'fontSize'        => 12,
@@ -1223,58 +1000,30 @@ $headerStyle = new Style([
     'align'           => [Style::FORMAT_ALIGN_CENTER, Style::FORMAT_ALIGN_VERTICAL_CENTER],
 ]);
 
-// 数据行样式：带边框 + 自动换行
-$dataStyle = new Style([
-    'border' => Style::BORDER_THIN,
-    'wrap'   => true,
-    'align'  => [Style::FORMAT_ALIGN_LEFT, Style::FORMAT_ALIGN_VERTICAL_TOP],
-]);
-
-// 应用到列
 new Column([
     'title'       => '备注',
     'field'       => 'remark',
     'width'       => 40,
-    'headerStyle' => $headerStyle,   // 表头单元格样式
-    'style'       => $dataStyle,     // 数据单元格样式
+    'headerStyle' => $headerStyle,
+    'style'       => new Style(['border' => Style::BORDER_THIN, 'wrap' => true]),
 ])
 ```
 
 ### 7.5 SheetStyle — Sheet 级样式
 
-应用于整个工作表的全局样式。
-
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `$gridline` | `?int` | `null` | 网格线显示模式。`null` 使用 Excel 默认 |
-| `$zoom` | `?int` | `null` | 缩放比例（百分比），如 `150` 表示 150% |
+| `$gridline` | `?int` | `null` | 网格线显示模式 |
+| `$zoom` | `?int` | `null` | 缩放比例（百分比） |
 | `$hide` | `bool` | `false` | 是否隐藏此 Sheet |
-| `$isFirst` | `bool` | `false` | 是否设为打开时的首个活动 Sheet |
+| `$isFirst` | `bool` | `false` | 是否设为首个活动 Sheet |
 
-**网格线常量：**
-
-| 常量 | 值 | 说明 |
+| 网格线常量 | 值 | 说明 |
 |---|---|---|
-| `SheetStyle::GRIDLINES_HIDE_ALL` | `0` | 隐藏所有网格线 |
-| `SheetStyle::GRIDLINES_SHOW_SCREEN` | `1` | 仅屏幕显示 |
-| `SheetStyle::GRIDLINES_SHOW_PRINT` | `2` | 仅打印显示 |
-| `SheetStyle::GRIDLINES_SHOW_ALL` | `3` | 屏幕 + 打印均显示 |
-
-**使用示例：**
-
-```php
-use BusinessG\BaseExcel\Data\Export\SheetStyle;
-
-new Sheet([
-    'name'    => '订单列表',
-    'style'   => new SheetStyle([
-        'gridline' => SheetStyle::GRIDLINES_HIDE_ALL,
-        'zoom'     => 120,
-    ]),
-    'columns' => [...],
-    // ...
-])
-```
+| `GRIDLINES_HIDE_ALL` | 0 | 隐藏所有 |
+| `GRIDLINES_SHOW_SCREEN` | 1 | 仅屏幕显示 |
+| `GRIDLINES_SHOW_PRINT` | 2 | 仅打印显示 |
+| `GRIDLINES_SHOW_ALL` | 3 | 全部显示 |
 
 ### 7.6 ImportConfig — 导入配置类
 
@@ -1282,38 +1031,26 @@ new Sheet([
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `$serviceName` | `string` | `'default'` | 服务名称，用于日志标识 |
+| `$serviceName` | `string` | `'default'` | 服务名称 |
 | `$isAsync` | `bool` | `false` | 是否异步执行 |
 | `$isProgress` | `bool` | `true` | 是否启用进度追踪 |
 | `$isDbLog` | `bool` | `true` | 是否写入数据库日志 |
-| `$isReturnSheetData` | `bool` | `false` | 是否将整个 Sheet 数据作为数组返回（而非逐行回调）。`true` 时不触发 callback，而是收集所有行数据返回 |
-| `$path` | `string` | `''` | Excel 文件路径。API 调用时由组件自动设置，CLI 调用时需手动传入 |
-| `$driverName` | `string` | `''` | 驱动名称，空则使用默认 |
-| `$token` | `string` | `''` | 任务唯一标识，空则自动生成 |
+| `$isReturnSheetData` | `bool` | `false` | 是否将 Sheet 数据作为数组返回（而非逐行回调） |
+| `$path` | `string` | `''` | Excel 文件路径 |
+| `$driverName` | `string` | `''` | 驱动名称 |
+| `$token` | `string` | `''` | 任务唯一标识 |
 
 ### 7.7 导入 Sheet
 
-每个 `Sheet` 对应要读取的一个 Excel 工作表。
-
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `$name` | `string` | `'sheet1'` | 工作表名称（按名称定位 Sheet） |
-| `$readType` | `string` | `'name'` | Sheet 定位方式：`'name'`（按名称）或 `'index'`（按索引） |
-| `$index` | `int` | `0` | Sheet 索引（readType='index' 时生效，从 0 开始） |
-| `$headerIndex` | `int` | `1` | 表头所在行号（从 1 开始）。如模板第 1 行是说明行、第 2 行是列标题，则设为 `2` |
+| `$name` | `string` | `'sheet1'` | 工作表名称 |
+| `$readType` | `string` | `'name'` | Sheet 定位方式：`'name'` 或 `'index'` |
+| `$index` | `int` | `0` | Sheet 索引（readType='index' 时生效） |
+| `$headerIndex` | `int` | `1` | 表头所在行号（从 1 开始） |
 | `$columns` | `Column[]` | `[]` | 列映射定义数组 |
-| `$callback` | `mixed` | `null` | 逐行回调。签名：`function(ImportRowCallbackParam $param): void` |
+| `$callback` | `mixed` | `null` | 逐行回调 |
 | `$skipEmptyRow` | `bool` | `true` | 是否跳过空行 |
-| `$skipRowIndex` | `bool` | `false` | 是否跳过表头行本身 |
-| `$isSetHeader` | `bool` | `false` | 为 true 时在回调中传入原始表头映射信息 |
-| `$isReturnSheetData` | `bool` | `false` | Sheet 级别的返回数据开关（覆盖 ImportConfig 的同名属性） |
-
-**readType 常量：**
-
-| 常量 | 值 | 说明 |
-|---|---|---|
-| `Sheet::SHEET_READ_TYPE_NAME` | `'name'` | 按名称匹配 Sheet |
-| `Sheet::SHEET_READ_TYPE_INDEX` | `'index'` | 按索引匹配 Sheet（第一个 Sheet 为 0） |
 
 **callback 参数 `ImportRowCallbackParam`：**
 
@@ -1321,23 +1058,19 @@ new Sheet([
 |---|---|---|
 | `$row` | `array` | 当前行数据，key 为 Column.field 映射后的字段名 |
 | `$rowIndex` | `int` | 数据行索引（从 0 开始，不含表头行） |
-| `$config` | `ImportConfig` | 导入配置实例（可获取 token、params 等） |
+| `$config` | `ImportConfig` | 导入配置实例 |
 | `$sheet` | `Sheet` | 当前 Sheet 实例 |
 | `$driver` | `DriverInterface` | 驱动实例 |
 
 ### 7.8 导入 Column
 
-定义 Excel 列标题到代码字段名的映射关系。
-
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `$title` | `string` | `''` | Excel 表头列标题。**必须与实际 Excel 文件中的列标题完全一致**，引擎通过标题匹配列位置 |
-| `$field` | `string` | `''` | 映射后的字段名。回调中 `$param->row[$field]` 获取该列值 |
-| `$type` | `int` | `TYPE_STRING` | 数据类型，读取时自动转换 |
+| `$title` | `string` | `''` | Excel 表头列标题，必须与实际文件完全一致 |
+| `$field` | `string` | `''` | 映射后的字段名 |
+| `$type` | `int` | `TYPE_STRING` | 数据类型 |
 
-**数据类型常量：**
-
-| 常量 | 值 | 说明 |
+| 数据类型常量 | 值 | 说明 |
 |---|---|---|
 | `Column::TYPE_STRING` | `0x01` | 字符串（默认） |
 | `Column::TYPE_INT` | `0x02` | 整数 |
@@ -1346,34 +1079,18 @@ new Sheet([
 
 ---
 
-## 8. 流程图
-
-### 8.1 同步导出时序图
-
-![同步导出时序图](docs/img/sync-export.png)
-
-### 8.2 异步导出时序图
-
-![异步导出时序图](docs/img/async-export.png)
-
-### 8.3 导入流程时序图（含动态模板）
-
-![导入流程时序图](docs/img/import-flow.png)
-
----
-
-## 9. 内置 Demo 配置
+## 8. 内置 Demo 配置
 
 组件预置以下 Demo 配置，发布配置后即可直接使用：
 
-| business_id | 配置类 | 同步/异步 | 输出方式 | 说明 |
-|---|---|---|---|---|
-| `demoExport` | DemoExportConfig | 同步 | UPLOAD | 100 条虚拟数据，返回文件路径 |
-| `demoExportOut` | DemoExportOutConfig | 同步 | OUT | 20 条数据，浏览器直接下载 |
-| `demoAsyncExport` | DemoAsyncExportConfig | 异步 | UPLOAD | 5 万条数据，带进度消息推送 |
-| `demoExportForImport` | DemoExportForImportConfig | 同步 | UPLOAD | 5 条数据，供导入测试 |
-| `demoImportTemplate` | DemoImportTemplateExportConfig | 同步 | OUT | 带样式说明行的导入模板 |
-| `demoImport` | DemoImportConfig | 同步 | — | 逐行校验姓名/邮箱 + 消息推送 |
+| business_id | 同步/异步 | 输出方式 | 说明 |
+|---|---|---|---|
+| `demoExport` | 同步 | UPLOAD | 100 条虚拟数据，返回文件路径 |
+| `demoExportOut` | 同步 | OUT | 20 条数据，浏览器直接下载 |
+| `demoAsyncExport` | 异步 | UPLOAD | 5 万条数据，带进度消息推送 |
+| `demoExportForImport` | 同步 | UPLOAD | 5 条数据，供导入测试 |
+| `demoImportTemplate` | 同步 | OUT | 带样式说明行的导入模板 |
+| `demoImport` | 同步 | — | 逐行校验姓名/邮箱 + 消息推送 |
 
 **快速验证：**
 
@@ -1394,30 +1111,151 @@ curl -X POST http://localhost:9501/excel/export \
 
 ---
 
-## 10. Hyperf 特别注意事项
+## 9. 依赖组件与配置
+
+以下 Composer 包由组件自动引入，无需手动安装。但部分包需要**确认已配置**：
+
+| 依赖包 | 用途 | 需要的配置 |
+|---|---|---|
+| `hyperf/filesystem` | 导出文件存储 | 需配置 `config/autoload/file.php` |
+| `hyperf/redis` | 进度追踪、消息队列 | 需配置 `config/autoload/redis.php` |
+| `hyperf/async-queue` | 异步导入导出 | 需配置 `config/autoload/async_queue.php` |
+| `hyperf/logger` | 组件日志输出 | 需配置 `config/autoload/logger.php` |
+| `hyperf/event` | 路由注册（BootApplication 事件） | 无需额外配置 |
+| `hyperf/command` | CLI 命令 | 无 |
+
+### 9.1 Filesystem — 必须配置
+
+`hyperf/filesystem` 需要配置文件存储。创建 `config/autoload/file.php`：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Hyperf\Filesystem\Adapter\LocalAdapterFactory;
+
+return [
+    'default' => 'local',
+    'storage' => [
+        'local' => [
+            'driver' => LocalAdapterFactory::class,
+            'root'   => BASE_PATH . '/runtime',
+        ],
+    ],
+];
+```
+
+> 如需存储到 OSS/S3 等云存储，安装对应 Flysystem 适配器包：
+> - 阿里云 OSS：`composer require hyperf/flysystem-oss`
+> - AWS S3：`composer require league/flysystem-aws-s3-v3`
+
+### 9.2 Redis — 必须配置
+
+确认 `config/autoload/redis.php` 存在并配置正确：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+return [
+    'default' => [
+        'host'     => \Hyperf\Support\env('REDIS_HOST', '127.0.0.1'),
+        'auth'     => \Hyperf\Support\env('REDIS_AUTH', null),
+        'port'     => (int) \Hyperf\Support\env('REDIS_PORT', 6379),
+        'db'       => (int) \Hyperf\Support\env('REDIS_DB', 0),
+        'pool'     => [
+            'min_connections' => 1,
+            'max_connections' => 10,
+            'connect_timeout' => 10.0,
+            'wait_timeout'    => 3.0,
+        ],
+    ],
+];
+```
+
+### 9.3 AsyncQueue — 异步模式需要
+
+使用异步导入导出时，确认 `config/autoload/async_queue.php` 存在：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+return [
+    'default' => [
+        'driver'         => \Hyperf\AsyncQueue\Driver\RedisDriver::class,
+        'redis'          => ['pool' => 'default'],
+        'channel'        => '{queue}',
+        'timeout'        => 2,
+        'retry_seconds'  => 5,
+        'handle_timeout' => 600,
+        'processes'      => 1,
+        'concurrent'     => ['limit' => 5],
+    ],
+];
+```
+
+### 9.4 Logger — 日志通道
+
+确认 `config/autoload/logger.php` 中有对应通道：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Monolog\Handler\StreamHandler;
+use Monolog\Formatter\LineFormatter;
+
+return [
+    'default' => [
+        'handler' => [
+            'class'       => StreamHandler::class,
+            'constructor' => [
+                'stream' => BASE_PATH . '/runtime/logs/hyperf.log',
+                'level'  => Monolog\Level::Debug,
+            ],
+        ],
+        'formatter' => [
+            'class'       => LineFormatter::class,
+            'constructor' => [
+                'format'                => null,
+                'dateFormat'            => 'Y-m-d H:i:s',
+                'allowInlineLineBreaks' => true,
+            ],
+        ],
+    ],
+];
+```
+
+---
+
+## 10. Hyperf 注意事项
 
 ### 10.1 env() 函数
 
 Hyperf 中 `env()` 不是全局函数，必须使用完整路径：
 
 ```php
-// ✅ 正确
+// 正确
 \Hyperf\Support\env('APP_URL', 'http://localhost:9501')
 
-// ❌ 错误 — 会抛出 "Call to undefined function env()"
+// 错误 — 会抛出 "Call to undefined function env()"
 env('APP_URL', 'http://localhost:9501')
 ```
 
 ### 10.2 异常处理器顺序
 
 组件通过 `ConfigProvider` 自动注册 `ExcelExceptionHandler`。
-如需确保它优先于其他异常处理器，请在 `config/autoload/exceptions.php` 中手动调整顺序：
+如需确保它优先于其他异常处理器，在 `config/autoload/exceptions.php` 中调整顺序：
 
 ```php
 return [
     'handler' => [
         'http' => [
-            // ⚠️ ExcelExceptionHandler 必须在通用 Handler 之前
             \BusinessG\HyperfExcel\Exception\Handler\ExcelExceptionHandler::class,
             \App\Exception\Handler\AppExceptionHandler::class,
         ],
