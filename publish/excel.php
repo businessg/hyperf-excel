@@ -139,18 +139,28 @@ return [
     |                   'snake' — 下划线，如 sheet_list_progress、is_end、template_url
     |
     | 响应格式（response 下）:
-    |  - codeField:    响应 JSON 中状态码的字段名，默认 'code'
-    |  - dataField:    响应 JSON 中数据的字段名，默认 'data'
-    |  - messageField: 响应 JSON 中消息的字段名，默认 'message'
-    |  - successCode:  成功时状态码的值，默认 0
+    |  - responseCallback: 响应构建闭包，可完全自定义响应结构
+    |    签名: function(ResponseContext $context): array
+    |    ResponseContext 属性: isSuccess(bool), code(int|string), data(mixed), message(string)
+    |    未配置时使用默认闭包，输出 {'code': $context->code, 'data': $context->data, 'message': $context->message}
+    |
+    |  示例: 如果项目约定响应格式为 {"status": 200, "result": {...}, "msg": "ok"}
+    |        则配置 response.responseCallback:
+    |        'responseCallback' => function(\BusinessG\BaseExcel\Data\ResponseContext $context): array {
+    |            return ['status' => $context->isSuccess ? 200 : $context->code, 'result' => $context->data, 'msg' => $context->message];
+    |        }
+    |
+    | 错误状态码（五位数，详见 ExcelErrorCode 常量类）:
+    |   0       — 成功
+    |   10xxx   — 请求参数错误（10001=business_id必填, 10002=文件无效, 10003=格式不支持）
+    |   20xxx   — 业务配置错误（20001=业务ID不存在, 20002=记录不存在, 20003/20004=异步限制）
+    |   30xxx   — 文件操作错误（30001~30008 文件相关操作失败）
+    |   40xxx   — Excel处理错误（40001=输出类型, 40002=Sheet不存在, 40003=列标题不存在）
+    |   50xxx   — 驱动/系统错误（50001~50005 驱动/容器相关）
     |
     | 上传配置（upload 接口保存路径）:
     |  - upload.disk: 文件系统磁盘名，对应 config/autoload/file.php 中 storage 的 key
     |  - upload.dir:  相对路径，导入文件存放目录（相对于 disk 根路径）
-    |
-    |  示例: 如果项目约定响应格式为 {"status": 200, "result": {...}, "msg": "ok"}
-    |        则配置 response.codeField => 'status', response.dataField => 'result',
-    |        response.messageField => 'msg', response.successCode => 200
     |
     */
     'http' => [
@@ -160,10 +170,9 @@ return [
         'domain' => \Hyperf\Support\env('APP_URL', 'http://localhost:9501'),
         'fieldNaming' => 'camel',
         'response' => [
-            'codeField' => 'code',
-            'dataField' => 'data',
-            'messageField' => 'message',
-            'successCode' => 0,
+            // 'responseCallback' => function(\BusinessG\BaseExcel\Data\ResponseContext $context): array {
+            //     return ['code' => $context->code, 'data' => $context->data, 'message' => $context->message];
+            // },
         ],
         'upload' => [
             'disk' => 'local',

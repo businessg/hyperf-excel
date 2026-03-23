@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BusinessG\HyperfExcel\Http\Controller;
 
 use BusinessG\BaseExcel\Contract\FilesystemResolverInterface;
+use BusinessG\BaseExcel\Exception\ExcelErrorCode;
 use BusinessG\BaseExcel\Service\ExcelBusinessService;
 use Hyperf\Contract\ConfigInterface;
 use Hyperf\HttpServer\Contract\RequestInterface;
@@ -85,12 +86,12 @@ class ExcelController
     {
         $file = $this->request->file('file');
         if (!$file || !$file->isValid()) {
-            return $this->response->json($this->service->errorResponse(422, '请上传有效的文件'));
+            return $this->response->json($this->service->errorResponse(ExcelErrorCode::UPLOAD_FILE_INVALID, '请上传有效的文件'));
         }
 
         $extension = $file->getExtension();
         if (!in_array($extension, ['xlsx', 'xls'])) {
-            return $this->response->json($this->service->errorResponse(422, '仅支持 xlsx, xls 格式'));
+            return $this->response->json($this->service->errorResponse(ExcelErrorCode::UPLOAD_FILE_FORMAT_UNSUPPORTED, '仅支持 xlsx, xls 格式'));
         }
 
         $config = $this->container->get(ConfigInterface::class);

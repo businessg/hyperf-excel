@@ -28,6 +28,7 @@ Hyperf 框架的 Excel 同步/异步导入导出组件，提供开箱即用的 H
 - [8. 内置 Demo 配置](#8-内置-demo-配置)
 - [9. 依赖组件与配置](#9-依赖组件与配置)
 - [10. Hyperf 注意事项](#10-hyperf-注意事项)
+- [错误状态码](#错误状态码)
 
 ---
 
@@ -228,11 +229,18 @@ return [
     |               'camel'（默认）— 驼峰，如 sheetListProgress、isEnd、templateUrl
     |               'snake' — 下划线，如 sheet_list_progress、is_end、template_url
     |
-    | response — 响应 JSON 字段映射:
-    |   codeField    : 状态码字段名，默认 'code'
-    |   dataField    : 数据字段名，默认 'data'
-    |   messageField : 消息字段名，默认 'message'
-    |   successCode  : 成功时的状态码值，默认 0
+    | response — 统一响应体构建（闭包）:
+    |   responseCallback : （可选）根据执行结果组装 HTTP 响应数组的闭包。
+    |     签名: function(ResponseContext $context): array
+    |     ResponseContext 属性:
+    |       - isSuccess (bool)      — 本次调用是否成功
+    |       - code (int|string)     — 组件错误码（成功时为 ExcelErrorCode::SUCCESS，即 0）
+    |       - data (mixed)          — 载荷
+    |       - message (string)      — 提示文案
+    |     返回值经 JSON 编码即为接口响应体（或与框架包装配合）。
+    |     未配置时使用默认闭包，返回 ['code' => $context->code, 'data' => $context->data, 'message' => $context->message]。
+    |     若需对齐既有 API 规范，可在闭包中改写字段名或嵌套结构，例如:
+    |       return ['errno' => $context->code, 'result' => $context->data, 'msg' => $context->message];
     |
     | upload — 文件上传配置:
     |   disk : 文件系统磁盘名，对应 config/autoload/file.php 中 storage 的 key
@@ -245,10 +253,10 @@ return [
         'domain'     => \Hyperf\Support\env('APP_URL', 'http://localhost:9501'),
         'fieldNaming' => 'camel',
         'response'   => [
-            'codeField'    => 'code',
-            'dataField'    => 'data',
-            'messageField' => 'message',
-            'successCode'  => 0,
+            // 自定义响应构建闭包（可选，未配置时使用默认闭包）
+            // 'responseCallback' => function(\BusinessG\BaseExcel\Data\ResponseContext $context): array {
+            //     return ['code' => $context->code, 'data' => $context->data, 'message' => $context->message];
+            // },
         ],
         'upload' => [
             'disk' => 'local',
@@ -1276,6 +1284,37 @@ return [
 > `ConfigProvider` 已自动添加此配置。如果手动配置了 listeners 文件，请确认包含此行。
 
 ---
+
+## 错误状态码
+
+组件使用统一的五位数错误状态码（`ExcelErrorCode` 常量类），`0` 表示成功。
+
+| 分类 | 码段 | 常量 | 值 | 说明 |
+|------|------|------|------|------|
+| 成功 | - | `SUCCESS` | 0 | 成功 |
+| 请求参数 | 10xxx | `BUSINESS_ID_REQUIRED` | 10001 | business_id 必填 |
+| | | `UPLOAD_FILE_INVALID` | 10002 | 上传文件无效 |
+| | | `UPLOAD_FILE_FORMAT_UNSUPPORTED` | 10003 | 文件格式不支持（仅 xlsx/xls） |
+| 业务配置 | 20xxx | `BUSINESS_ID_NOT_FOUND` | 20001 | 业务ID不存在 |
+| | | `PROGRESS_RECORD_NOT_FOUND` | 20002 | 进度/消息记录不存在 |
+| | | `ASYNC_OUT_NOT_SUPPORTED` | 20003 | 异步不支持 OUT 直接输出类型 |
+| | | `ASYNC_RETURN_SHEET_NOT_SUPPORTED` | 20004 | 异步不支持返回 sheet 数据 |
+| 文件操作 | 30xxx | `FILE_PATH_NOT_EXISTS` | 30001 | 文件路径不存在 |
+| | | `FILE_COPY_FAILED` | 30002 | 文件复制失败 |
+| | | `FILE_DOWNLOAD_FAILED` | 30003 | 文件下载失败 |
+| | | `TEMP_FILE_CREATE_FAILED` | 30004 | 临时文件创建失败 |
+| | | `TEMP_DIR_CREATE_FAILED` | 30005 | 临时目录创建失败 |
+| | | `FILE_UPLOAD_FAILED` | 30006 | 文件上传存储失败 |
+| | | `IMPORT_FILE_NOT_EXISTS` | 30007 | 导入文件不存在 |
+| | | `FILE_MIME_TYPE_ERROR` | 30008 | 文件 MIME 类型错误 |
+| Excel处理 | 40xxx | `OUTPUT_TYPE_ERROR` | 40001 | 输出类型错误 |
+| | | `SHEET_NOT_EXISTS` | 40002 | Sheet 不存在 |
+| | | `COLUMN_HEADER_NOT_EXISTS` | 40003 | 列标题不存在 |
+| 驱动/系统 | 50xxx | `DRIVER_INVALID_NAME` | 50001 | 无效驱动名称 |
+| | | `DRIVER_CLASS_INVALID` | 50002 | 驱动类不存在或无效 |
+| | | `DRIVER_NOT_IMPLEMENTS` | 50003 | 驱动类未实现接口 |
+| | | `CONTAINER_RESOLVER_NOT_SET` | 50004 | 容器解析器未设置 |
+| | | `EXCEL_INTERFACE_NOT_REGISTERED` | 50005 | ExcelInterface 未注册 |
 
 ## License
 
