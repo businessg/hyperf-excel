@@ -285,11 +285,13 @@ return [
 
 Hyperf 通过组件 `ConfigProvider` 向框架注册 `listeners` 数组中的类（实现 `Hyperf\Event\Contract\ListenerInterface`）。与 Laravel 直接使用 BaseExcel 监听器不同，此处一般为 **Hyperf 适配器类**（如 `HyperfProgressListener`、`HyperfExcelLogDbListener`），内部再委托给 `BusinessG\BaseExcel\Listener\*`；`RegisterRouteListener` 用于在应用启动时注册 HTTP 路由。
 
+默认与解析逻辑由 **`BusinessG\HyperfExcel\Config\HyperfListenersConfig`** 承担（`fromExcelArray()`）：与 base-excel 的 `ListenersConfig`（面向 Base 监听器）分离，避免在基础包根目录放置独立 `config/` 文件。
+
 解析顺序（启动时）：
 
-1. 若存在 `BASE_PATH/config/autoload/excel.php`，且其中 **`listeners` 为非空数组**，则使用该列表。
+1. 若存在 `BASE_PATH/config/autoload/excel.php`，且其中 **`listeners` 为非空数组**，则合并进待解析配置并优先采用。
 2. 否则使用 **hyperf-excel** 包内 `publish/excel.php` 中的 `listeners`。
-3. 若仍无法得到非空列表，则回退为内置默认：`HyperfProgressListener`、`HyperfExcelLogDbListener`、`RegisterRouteListener`。
+3. 若 `listeners` 未配置或为空数组，则使用 `HyperfListenersConfig` 构造函数中的默认三类：`HyperfProgressListener`、`HyperfExcelLogDbListener`、`RegisterRouteListener`。
 
 修改监听器后需重启 Hyperf 进程使配置生效。
 

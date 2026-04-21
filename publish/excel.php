@@ -105,8 +105,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | 注册到 Hyperf 的监听器类名列表（通常为 Hyperf 适配器类）。
-    | ConfigProvider 优先采用项目 config/autoload/excel.php 中非空的 listeners，
-    | 否则使用此处；若仍为空则回退为内置默认（进度、DB 日志、路由注册）。
+    | 由 BusinessG\HyperfExcel\Config\HyperfListenersConfig 解析；优先采用项目
+    | config/autoload/excel.php 中非空的 listeners，否则使用此处；若仍为空则回退为
+    | 内置默认（进度、DB 日志、路由注册）。
     |
     */
     'listeners' => [

@@ -45,9 +45,7 @@ use BusinessG\HyperfExcel\Command\ExportCommand;
 use BusinessG\HyperfExcel\Command\ImportCommand;
 use BusinessG\HyperfExcel\Command\MessageCommand;
 use BusinessG\HyperfExcel\Command\ProgressCommand;
-use BusinessG\HyperfExcel\Listener\HyperfExcelLogDbListener;
-use BusinessG\HyperfExcel\Listener\HyperfProgressListener;
-use BusinessG\HyperfExcel\Listener\RegisterRouteListener;
+use BusinessG\HyperfExcel\Config\HyperfListenersConfig;
 use BusinessG\HyperfExcel\Process\CleanFileProcess;
 use BusinessG\HyperfExcel\Queue\AsyncQueue\ExcelQueue;
 
@@ -65,15 +63,7 @@ class ConfigProvider
                 }
             }
         }
-        $defaultHyperfListeners = [
-            HyperfProgressListener::class,
-            HyperfExcelLogDbListener::class,
-            RegisterRouteListener::class,
-        ];
-        $hyperfListeners = $excelPublish['listeners'] ?? null;
-        if (! is_array($hyperfListeners) || $hyperfListeners === []) {
-            $hyperfListeners = $defaultHyperfListeners;
-        }
+        $hyperfListeners = HyperfListenersConfig::fromExcelArray($excelPublish)->classNames;
 
         return [
             'dependencies' => [
