@@ -1,7 +1,6 @@
 {
     "name": "businessg/hyperf-excel",
     "type": "library",
-    "version": "1.0.1-beta.6",
     "license": "MIT",
     "keywords": [
         "php",
