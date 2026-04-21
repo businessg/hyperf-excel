@@ -101,6 +101,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | 事件监听器（Hyperf Event）
+    |--------------------------------------------------------------------------
+    |
+    | 注册到 Hyperf 的监听器类名列表（通常为 Hyperf 适配器类）。
+    | ConfigProvider 优先采用项目 config/autoload/excel.php 中非空的 listeners，
+    | 否则使用此处；若仍为空则回退为内置默认（进度、DB 日志、路由注册）。
+    |
+    */
+    'listeners' => [
+        \BusinessG\HyperfExcel\Listener\HyperfProgressListener::class,
+        \BusinessG\HyperfExcel\Listener\HyperfExcelLogDbListener::class,
+        \BusinessG\HyperfExcel\Listener\RegisterRouteListener::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | 临时文件清理配置
     |--------------------------------------------------------------------------
     |

@@ -55,6 +55,26 @@ class ConfigProvider
 {
     public function __invoke(): array
     {
+        $excelPublish = require __DIR__ . '/../publish/excel.php';
+        if (defined('BASE_PATH')) {
+            $appExcelPath = BASE_PATH . '/config/autoload/excel.php';
+            if (is_file($appExcelPath)) {
+                $appExcel = require $appExcelPath;
+                if (isset($appExcel['listeners']) && is_array($appExcel['listeners']) && $appExcel['listeners'] !== []) {
+                    $excelPublish['listeners'] = $appExcel['listeners'];
+                }
+            }
+        }
+        $defaultHyperfListeners = [
+            HyperfProgressListener::class,
+            HyperfExcelLogDbListener::class,
+            RegisterRouteListener::class,
+        ];
+        $hyperfListeners = $excelPublish['listeners'] ?? null;
+        if (! is_array($hyperfListeners) || $hyperfListeners === []) {
+            $hyperfListeners = $defaultHyperfListeners;
+        }
+
         return [
             'dependencies' => [
                 FrameworkBridgeInterface::class => static fn (ContainerInterface $c) => new HyperfBridge($c),
@@ -107,11 +127,7 @@ class ConfigProvider
                 ProgressCommand::class,
                 MessageCommand::class,
             ],
-            'listeners' => [
-                HyperfProgressListener::class,
-                HyperfExcelLogDbListener::class,
-                RegisterRouteListener::class,
-            ],
+            'listeners' => $hyperfListeners,
             'processes' => [
                 CleanFileProcess::class,
             ],
