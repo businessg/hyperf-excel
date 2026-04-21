@@ -30,7 +30,11 @@ class ExcelQueue implements ExcelQueueInterface
 
     public function push(BaseConfig $config): void
     {
-        $job = $config instanceof ExportConfig ? ExportJob::class : ImportJob::class;
-        $this->queue->push(new $job($config));
+        $jobClass = $config instanceof ExportConfig ? ExportJob::class : ImportJob::class;
+        $job = new $jobClass($config);
+        if ($this->excelConfig->queue->tries !== null) {
+            $job->setMaxAttempts($this->excelConfig->queue->tries);
+        }
+        $this->queue->push($job);
     }
 }

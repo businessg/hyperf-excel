@@ -14,8 +14,6 @@ abstract class BaseJob extends Job
 {
     use ExcelJobTrait;
 
-    protected int $maxAttempts = 0;
-
     public function __construct(BaseConfig $config)
     {
         $this->config = $config;

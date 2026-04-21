@@ -55,6 +55,8 @@ return [
     | 当导入/导出配置为异步 (isAsync=true) 时，任务将推送到队列执行。
     |  - connection: 队列连接名，对应 config/autoload/async_queue.php 中的 key
     |  - channel:    队列通道名（Hyperf AsyncQueue 暂不区分 channel，设为 'default' 即可）
+    |  - tries:      可选。映射为 AsyncQueue Job 的 maxAttempts；仅当需要覆盖时再配置，
+    |                 否则使用 Hyperf AsyncQueue Job 默认与 async_queue 驱动配置
     |
     */
     'queue' => [
