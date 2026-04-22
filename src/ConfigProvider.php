@@ -54,16 +54,15 @@ class ConfigProvider
     public function __invoke(): array
     {
         $excelPublish = require __DIR__ . '/../publish/excel.php';
+        $appExcel = [];
         if (defined('BASE_PATH')) {
             $appExcelPath = BASE_PATH . '/config/autoload/excel.php';
             if (is_file($appExcelPath)) {
-                $appExcel = require $appExcelPath;
-                if (isset($appExcel['listeners']) && is_array($appExcel['listeners']) && $appExcel['listeners'] !== []) {
-                    $excelPublish['listeners'] = $appExcel['listeners'];
-                }
+                $loaded = require $appExcelPath;
+                $appExcel = is_array($loaded) ? $loaded : [];
             }
         }
-        $hyperfListeners = HyperfListenersConfig::fromExcelArray($excelPublish)->classNames;
+        $hyperfListeners = HyperfListenersConfig::resolveFromPublishAndApp($excelPublish, $appExcel);
 
         return [
             'dependencies' => [

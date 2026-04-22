@@ -104,16 +104,24 @@ return [
     | 事件监听器（Hyperf Event）
     |--------------------------------------------------------------------------
     |
-    | 注册到 Hyperf 的监听器类名列表（通常为 Hyperf 适配器类）。
-    | 由 BusinessG\HyperfExcel\Config\HyperfListenersConfig 解析；优先采用项目
-    | config/autoload/excel.php 中非空的 listeners，否则使用此处；若仍为空则回退为
-    | 内置默认（进度、DB 日志、路由注册）。
+    | 组件内置默认监听器（始终启用，无需在此重复声明）：
+    |   - \BusinessG\HyperfExcel\Listener\HyperfProgressListener   进度追踪（受 progress.enabled 控制）
+    |   - \BusinessG\HyperfExcel\Listener\HyperfExcelLogDbListener 数据库日志（受 dbLog.enabled 控制）
+    |   - \BusinessG\HyperfExcel\Listener\RegisterRouteListener    HTTP 路由注册（受 http.enabled 控制）
+    |
+    | 这里是“追加监听器”配置，不是覆盖默认监听器：
+    |  - 未配置或 []：仅使用组件默认监听器
+    |  - 配置类名：在默认监听器后追加注册（默认在前，追加在后）
+    |  - 重复类名：自动去重（同类只保留一份，按首次出现位置保留）
+    |
+    | 自定义监听器可直接继承 \BusinessG\BaseExcel\Listener\AbstractBaseListener，
+    | 并通过 \BusinessG\HyperfExcel\Listener\HyperfListenerAdapter 适配到 Hyperf 事件。
+    | 需要把导入导出过程打到日志时，可取消下面一行注释（日志通道见上「logging」）。
+    | 修改后请重新启动服务。
     |
     */
     'listeners' => [
-        \BusinessG\HyperfExcel\Listener\HyperfProgressListener::class,
-        \BusinessG\HyperfExcel\Listener\HyperfExcelLogDbListener::class,
-        \BusinessG\HyperfExcel\Listener\RegisterRouteListener::class,
+        // \BusinessG\HyperfExcel\Listener\HyperfExcelLogListener::class,
     ],
 
     /*

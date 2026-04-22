@@ -4,45 +4,74 @@ declare(strict_types=1);
 
 namespace BusinessG\HyperfExcel\Config;
 
+use BusinessG\BaseExcel\Config\ListenerClassListMerge;
 use BusinessG\HyperfExcel\Listener\HyperfExcelLogDbListener;
 use BusinessG\HyperfExcel\Listener\HyperfProgressListener;
 use BusinessG\HyperfExcel\Listener\RegisterRouteListener;
 
 /**
- * Hyperf excel 配置中的 `listeners`：注册到 Hyperf Event 的监听器类名列表。
- *
- * 与 {@see \BusinessG\BaseExcel\Config\ListenersConfig} 区分：此处为 Hyperf 适配器类，
- * 而非 BaseExcel 的 {@see \BusinessG\BaseExcel\Listener\AbstractBaseListener} 子类。
+ * Hyperf Event：`config` 中 `listeners` 与 {@see self::defaultClassNames()} 经
+ * {@see ListenerClassListMerge} 合并。publish 与 autoload 两处的类名**先**拼成 config 段**再**与默认
+ * 合并。各层可写 `[]` 表示本层不追加。默认不在 publish 中重复写。
  */
 final class HyperfListenersConfig
 {
-    /**
-     * @param array<int, class-string> $classNames
-     */
-    public function __construct(
-        public readonly array $classNames = [
-            HyperfProgressListener::class,
-            HyperfExcelLogDbListener::class,
-            RegisterRouteListener::class,
-        ],
-    ) {
+    private function __construct()
+    {
     }
 
     /**
-     * @param array<string, mixed> $excel 合并后的 excel 配置（publish 与 config/autoload 等）
+     * 内置默认监听器（不依赖 publish / config 文件）。
+     *
+     * @return array<int, class-string>
      */
-    public static function fromExcelArray(array $excel): self
+    public static function defaultClassNames(): array
     {
-        $configured = $excel['listeners'] ?? null;
-        if (is_array($configured) && $configured !== []) {
-            $classes = array_values(array_filter(
-                $configured,
-                static fn (mixed $c): bool => is_string($c) && $c !== ''
-            ));
+        return [
+            HyperfProgressListener::class,
+            HyperfExcelLogDbListener::class,
+            RegisterRouteListener::class,
+        ];
+    }
 
-            return new self(classNames: $classes);
-        }
+    /**
+     * 从 publish 与 autoload 的配置数组中收集 `listeners` 里显式声明的类名（先后合并为 [publish..., app...]）。
+     *
+     * @param array<string, mixed> $publishExcel
+     * @param array<string, mixed> $appExcel
+     *
+     * @return array<int, class-string>
+     */
+    public static function collectConfigListenerClasses(array $publishExcel, array $appExcel = []): array
+    {
+        return array_merge(
+            ListenerClassListMerge::normalize($publishExcel['listeners'] ?? null),
+            ListenerClassListMerge::normalize($appExcel['listeners'] ?? null),
+        );
+    }
 
-        return new self();
+    /**
+     * 将「仅来自配置」的类名与代码默认用 {@see ListenerClassListMerge} 合并。
+     *
+     * @param array<int, class-string> $configOnlyClasses
+     *
+     * @return array<int, class-string>
+     */
+    public static function mergeWithDefaults(array $configOnlyClasses = []): array
+    {
+        return ListenerClassListMerge::merge(self::defaultClassNames(), $configOnlyClasses);
+    }
+
+    /**
+     * @param array<string, mixed> $publishExcel
+     * @param array<string, mixed> $appExcel
+     *
+     * @return array<int, class-string>
+     */
+    public static function resolveFromPublishAndApp(array $publishExcel, array $appExcel = []): array
+    {
+        $extra = self::collectConfigListenerClasses($publishExcel, $appExcel);
+
+        return self::mergeWithDefaults($extra);
     }
 }
